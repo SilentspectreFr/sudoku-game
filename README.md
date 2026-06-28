@@ -57,4 +57,8 @@ node -e "require('./js/sudoku-engine.js'); console.table(SudokuEngine.selfTest()
 
 ## Déploiement
 
-Site statique. Une fois le repo lié à Netlify, **`git push origin main` = déploiement**.
+**En ligne : https://sudoku-fred.netlify.app**
+
+Site statique déployé via la CLI Netlify (le dossier est lié au site `sudoku-fred`).
+Pour publier une nouvelle version : `netlify deploy --prod --dir .`. *(L'auto-deploy sur
+`git push` n'est pas branché ; connecter le repo dans l'UI Netlify pour l'activer.)*

@@ -3,10 +3,15 @@
 Jeu de Sudoku perso de Fred, **mobile-first**, en **HTML/CSS/JS pur** (aucun build, aucune
 dépendance, aucun framework). Repo public `SilentspectreFr/sudoku-game`.
 
-## Règle d'or déploiement
-Site statique → une fois le repo lié à Netlify, **`git push origin main` = déploiement**.
-(Netlify n'est PAS encore branché : étape ultérieure, Fred connecte le repo dans l'UI Netlify
-puis le push déploiera. `netlify.toml` est déjà prêt avec `publish = "."`.)
+## Déploiement (EN PROD le 28/06)
+- **URL live : https://sudoku-fred.netlify.app** (site Netlify `sudoku-fred`, équipe FLOWXIFY,
+  compte `fjouvin`, project id `88126486-308d-4926-be4a-b81ebbbfb50c`).
+- Déployé par **CLI Netlify en direct** (`netlify deploy --prod --dir .`), site statique,
+  `publish = "."`. Le dossier `~/Dev/sudoku-game` est **lié** au site.
+- ⚠️ **PAS d'auto-deploy GitHub** : un `git push` ne redéploie PAS tout seul. Pour publier une
+  nouvelle version : `cd ~/Dev/sudoku-game && netlify deploy --prod --dir .`.
+- Pour activer l'auto-deploy sur push : connecter le repo `SilentspectreFr/sudoku-game` dans
+  l'UI Netlify (Site config → Build & deploy → link repository) — étape manuelle (OAuth GitHub).
 
 ## Lancer en local
 Pas de modules ES → on peut ouvrir `index.html` directement. Sinon :
