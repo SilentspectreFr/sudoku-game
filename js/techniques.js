@@ -97,14 +97,14 @@
   // =========================================================================
 
   // 1. Dernière case libre (Full House) : une unité n'a qu'une case vide.
-  function detectFullHouse(g, cands) {
+  function detectFullHouse(g, cands, out) {
     for (const u of UNIT_DEFS) {
       const empties = u.cells.filter((i) => !g[i]);
       if (empties.length === 1) {
         const cell = empties[0];
         const digit = digitsOf(cands[cell])[0];
         if (!digit) continue;
-        return {
+        const inst = {
           technique: 'fullHouse',
           placements: [{ cell, digit }],
           highlight: { unitCells: u.cells.slice(), cells: [cell], place: [{ cell, digit }] },
@@ -112,6 +112,7 @@
             + cellName(cell) + '. Le seul chiffre manquant de cette unité est le ' + digit
             + ' : on le place donc en ' + cellName(cell) + '.',
         };
+        if (out) out.push(inst); else return inst;
       }
     }
     return null;
@@ -119,7 +120,7 @@
 
   // 2/5. Singleton caché : dans une unité, un chiffre n'a qu'une case possible.
   //   scope 'box' = Dernière case restante ; 'all' = Singletons cachés.
-  function detectHiddenSingle(g, cands, scope) {
+  function detectHiddenSingle(g, cands, scope, out) {
     const units = scope === 'box' ? BOXES : UNIT_DEFS;
     for (const u of units) {
       const present = new Set(u.cells.map((i) => g[i]).filter(Boolean));
@@ -128,9 +129,7 @@
         const spots = u.cells.filter((i) => !g[i] && (cands[i] & bit(d)));
         if (spots.length === 1) {
           const cell = spots[0];
-          // (si la case n'a qu'un candidat, c'est plutôt un naked single ; on
-          //  laisse quand même, le tri par difficulté gère la priorité)
-          return {
+          const inst = {
             technique: 'hiddenSingle',
             scope,
             placements: [{ cell, digit: d }],
@@ -139,6 +138,7 @@
               + cellName(cell) + ' (toutes les autres cases de l’unité sont occupées '
               + 'ou voient déjà un ' + d + '). On place le ' + d + '.',
           };
+          if (out) out.push(inst); else return inst;
         }
       }
     }
@@ -146,12 +146,12 @@
   }
 
   // 3. Singleton nu / Dernier chiffre possible : une case n'a qu'un candidat.
-  function detectNakedSingle(g, cands) {
+  function detectNakedSingle(g, cands, out) {
     for (let i = 0; i < 81; i++) {
       if (g[i]) continue;
       if (popcount(cands[i]) === 1) {
         const digit = digitsOf(cands[i])[0];
-        return {
+        const inst = {
           technique: 'nakedSingle',
           placements: [{ cell: i, digit }],
           highlight: { cells: [i], place: [{ cell: i, digit }] },
@@ -159,13 +159,14 @@
             + 'ligne, sa colonne et son bloc : il ne lui reste qu’un seul candidat possible, le '
             + digit + '. On le place.',
         };
+        if (out) out.push(inst); else return inst;
       }
     }
     return null;
   }
 
   // 6/7. Sous-ensemble nu (paire/triplet nu).
-  function detectNakedSubset(g, cands, size) {
+  function detectNakedSubset(g, cands, size, out) {
     for (const u of UNIT_DEFS) {
       const empties = u.cells.filter((i) => !g[i] && popcount(cands[i]) >= 2 && popcount(cands[i]) <= size);
       if (empties.length < size) continue;
@@ -182,7 +183,7 @@
         }
         if (!elims.length) continue;
         const ds = digitsOf(union);
-        return {
+        const inst = {
           technique: size === 2 ? 'nakedPair' : 'nakedTriple',
           eliminations: elims,
           highlight: { unitCells: u.cells.slice(), cells: grp.slice(), baseDigits: ds, elim: elims.slice() },
@@ -190,13 +191,14 @@
             + 'chiffres {' + ds.join(', ') + '} (' + size + ' cases pour ' + size + ' chiffres). Ces chiffres '
             + 'leur sont donc réservés : on les retire des candidats des autres cases de l’unité.',
         };
+        if (out) out.push(inst); else return inst;
       }
     }
     return null;
   }
 
   // 8/9. Sous-ensemble caché (paire/triplet caché).
-  function detectHiddenSubset(g, cands, size) {
+  function detectHiddenSubset(g, cands, size, out) {
     for (const u of UNIT_DEFS) {
       // pour chaque chiffre absent, ses cases candidates dans l'unité
       const spotsByDigit = {};
@@ -230,7 +232,7 @@
           if (extra) for (const d of digitsOf(extra)) elims.push({ cell: i, digit: d });
         }
         if (!elims.length) continue;
-        return {
+        const inst = {
           technique: size === 2 ? 'hiddenPair' : 'hiddenTriple',
           eliminations: elims,
           highlight: { unitCells: u.cells.slice(), cells: [...cellSet], baseDigits: grp.slice(), elim: elims.slice() },
@@ -238,6 +240,7 @@
             + 'dans les cases ' + cellsName([...cellSet]) + ' (' + size + ' chiffres pour ' + size + ' cases). '
             + 'Ces cases leur sont réservées : on retire tous leurs autres candidats.',
         };
+        if (out) out.push(inst); else return inst;
       }
     }
     return null;
@@ -246,7 +249,7 @@
   // 10/11. Candidats verrouillés "pointants" (paire/triplet pointant).
   //   Dans un bloc, un chiffre n'a de candidats que sur une seule ligne (ou colonne)
   //   -> on l'élimine du reste de cette ligne/colonne, hors du bloc.
-  function detectPointing(g, cands, size) {
+  function detectPointing(g, cands, size, out) {
     for (const box of BOXES) {
       const present = new Set(box.cells.map((i) => g[i]).filter(Boolean));
       for (let d = 1; d <= 9; d++) {
@@ -265,7 +268,7 @@
           if (cands[i] & bit(d)) elims.push({ cell: i, digit: d });
         }
         if (!elims.length) continue;
-        return {
+        const inst = {
           technique: spots.length === 2 ? 'pointingPair' : 'pointingTriple',
           eliminations: elims,
           highlight: { unitCells: box.cells.slice(), lineCells: line.cells.slice(), cells: spots.slice(), baseDigits: [d], elim: elims.slice() },
@@ -274,6 +277,7 @@
             + 'sur cette ' + (line.type === 'row' ? 'ligne' : 'colonne') + ' : on retire le ' + d
             + ' du reste de ' + unitName(line) + ', hors du bloc.',
         };
+        if (out) out.push(inst); else return inst;
       }
     }
     return null;
@@ -294,7 +298,7 @@
     return { rowCols, colRows };
   }
 
-  function detectFish(g, cands, size) {
+  function detectFish(g, cands, size, out) {
     for (let d = 1; d <= 9; d++) {
       const pos = digitPositions(g, cands, d);
       for (const base of ['row', 'col']) {
@@ -323,7 +327,7 @@
           for (const x of cover) for (let l = 0; l < 9; l++) lineCells.push(at(l, x));
           const baseName = base === 'row' ? 'lignes' : 'colonnes';
           const coverName = base === 'row' ? 'colonnes' : 'lignes';
-          return {
+          const inst = {
             technique: size === 2 ? 'xWing' : 'swordfish',
             eliminations: elims,
             highlight: { cells: baseCells, lineCells, baseDigits: [d], elim: elims.slice() },
@@ -334,6 +338,7 @@
               + coverName.slice(0, -1) + ') : on élimine donc le ' + d + ' de ces ' + coverName
               + ' dans les autres ' + baseName + '.',
           };
+          if (out) out.push(inst); else return inst;
         }
       }
     }
@@ -342,7 +347,7 @@
 
   // 13. Y-Wing (XY-Wing) : pivot bivaleur {A,B} relié à deux pinces {A,C} et {B,C}.
   //   Le chiffre C s'élimine de toute case voyant les DEUX pinces.
-  function detectYWing(g, cands) {
+  function detectYWing(g, cands, out) {
     const biv = [];
     for (let i = 0; i < 81; i++) if (!g[i] && popcount(cands[i]) === 2) biv.push(i);
     for (const P of biv) {
@@ -369,7 +374,7 @@
             elims.push({ cell, digit: c });
           }
           if (!elims.length) continue;
-          return {
+          const inst = {
             technique: 'yWing',
             eliminations: elims,
             highlight: { cells: [P, Q, R], baseDigits: [a, b, c], elim: elims.slice() },
@@ -379,6 +384,7 @@
               + 'voyant les deux pinces ne peut donc pas contenir ' + c + '. On retire le ' + c + ' de '
               + cellsName(elims.map((e) => e.cell)) + '.',
           };
+          if (out) out.push(inst); else return inst;
         }
       }
     }
@@ -435,7 +441,7 @@
     },
     {
       id: 'lastRemaining', title: 'Dernière case restante', level: 'debutant', rank: 2,
-      detect: (g, c) => detectHiddenSingle(g, c, 'box'), gen: ['facile', 'moyen'],
+      detect: (g, c, out) => detectHiddenSingle(g, c, 'box', out), gen: ['facile', 'moyen'],
       summary: 'Dans un bloc, un chiffre ne peut souvent aller que dans une seule case, parce que les autres voient déjà ce chiffre sur leur ligne ou leur colonne.',
       how: 'Choisis un chiffre, balaie un bloc : barre les cases où ce chiffre apparaît déjà sur la ligne ou la colonne. S’il ne reste qu’une case, c’est là.',
     },
@@ -453,49 +459,49 @@
     },
     {
       id: 'hiddenSingle', title: 'Singletons cachés', level: 'technique', rank: 4,
-      detect: (g, c) => detectHiddenSingle(g, c, 'all'), gen: ['moyen', 'difficile'],
+      detect: (g, c, out) => detectHiddenSingle(g, c, 'all', out), gen: ['moyen', 'difficile'],
       summary: 'Un « singleton caché » : dans une ligne, une colonne ou un bloc, un chiffre n’a qu’une seule case candidate, même si cette case a d’autres candidats.',
       how: 'Pour chaque chiffre, regarde dans une unité combien de cases peuvent l’accueillir. Une seule ? Le chiffre y va, peu importe ses autres candidats.',
     },
     {
       id: 'nakedPair', title: 'Paires nues', level: 'technique', rank: 5,
-      detect: (g, c) => detectNakedSubset(g, c, 2), gen: ['difficile', 'expert'],
+      detect: (g, c, out) => detectNakedSubset(g, c, 2, out), gen: ['difficile', 'expert'],
       summary: 'Deux cases d’une même unité qui portent exactement les deux mêmes candidats {a, b} se réservent ces deux chiffres : on les retire des autres cases de l’unité.',
       how: 'Cherche deux cases alignées (même ligne, colonne ou bloc) avec le même couple de candidats. Ces deux chiffres n’iront nulle part ailleurs dans l’unité.',
     },
     {
       id: 'nakedTriple', title: 'Triplets nus', level: 'technique', rank: 6,
-      detect: (g, c) => detectNakedSubset(g, c, 3), gen: ['difficile', 'expert'],
+      detect: (g, c, out) => detectNakedSubset(g, c, 3, out), gen: ['difficile', 'expert'],
       summary: 'Trois cases d’une même unité dont les candidats tiennent en trois chiffres {a, b, c} se réservent ces trois chiffres (chaque case n’a pas besoin des trois).',
       how: 'Trois cases d’une unité dont l’union des candidats fait exactement trois chiffres. On retire ces chiffres des autres cases de l’unité.',
     },
     {
       id: 'hiddenPair', title: 'Paires cachées', level: 'technique', rank: 7,
-      detect: (g, c) => detectHiddenSubset(g, c, 2), gen: ['difficile', 'expert'],
+      detect: (g, c, out) => detectHiddenSubset(g, c, 2, out), gen: ['difficile', 'expert'],
       summary: 'Deux chiffres qui, dans une unité, ne peuvent se placer que dans les deux mêmes cases : ces cases leur sont réservées, on en retire tous les autres candidats.',
       how: 'Trouve deux chiffres dont les seules cases possibles dans l’unité sont les deux mêmes. Nettoie ces deux cases de leurs autres candidats.',
     },
     {
       id: 'hiddenTriple', title: 'Triplets cachés', level: 'technique', rank: 8,
-      detect: (g, c) => detectHiddenSubset(g, c, 3), gen: ['expert'],
+      detect: (g, c, out) => detectHiddenSubset(g, c, 3, out), gen: ['expert'],
       summary: 'Trois chiffres confinés aux trois mêmes cases d’une unité : on retire tous les autres candidats de ces trois cases.',
       how: 'Trois chiffres dont les cases possibles dans l’unité se réduisent à trois cases communes. On y supprime tout le reste.',
     },
     {
       id: 'pointingPair', title: 'Paires pointantes', level: 'technique', rank: 9,
-      detect: (g, c) => detectPointing(g, c, 2), gen: ['difficile', 'expert'],
+      detect: (g, c, out) => detectPointing(g, c, 2, out), gen: ['difficile', 'expert'],
       summary: 'Dans un bloc, si un chiffre n’a que deux cases candidates et qu’elles sont sur la même ligne (ou colonne), ce chiffre quitte le reste de cette ligne/colonne.',
       how: 'Un chiffre confiné à deux cases d’un bloc, alignées : il « pointe » sur cette ligne/colonne et s’élimine ailleurs sur celle-ci.',
     },
     {
       id: 'pointingTriple', title: 'Triplets pointants', level: 'technique', rank: 9,
-      detect: (g, c) => detectPointing(g, c, 3), gen: ['expert'],
+      detect: (g, c, out) => detectPointing(g, c, 3, out), gen: ['expert'],
       summary: 'Même idée que la paire pointante, mais le chiffre occupe trois cases alignées d’un bloc.',
       how: 'Un chiffre confiné à trois cases alignées d’un bloc s’élimine du reste de leur ligne ou colonne.',
     },
     {
       id: 'xWing', title: 'X-Wing', level: 'avance', rank: 11,
-      detect: (g, c) => detectFish(g, c, 2), gen: ['expert'],
+      detect: (g, c, out) => detectFish(g, c, 2, out), gen: ['expert'],
       summary: 'Un chiffre candidat dans seulement deux cases sur deux lignes, alignées sur les deux mêmes colonnes, forme un rectangle (X-Wing) : on l’élimine de ces deux colonnes ailleurs (et symétriquement lignes ↔ colonnes).',
       how: 'Repère un chiffre confiné à 2 cases sur deux lignes, dans les deux mêmes colonnes. Élimine-le de ces colonnes dans les autres lignes (ou l’inverse).',
     },
@@ -507,7 +513,7 @@
     },
     {
       id: 'swordfish', title: 'Swordfish', level: 'avance', rank: 13,
-      detect: (g, c) => detectFish(g, c, 3), gen: ['expert'],
+      detect: (g, c, out) => detectFish(g, c, 3, out), gen: ['expert'],
       summary: 'La généralisation du X-Wing à trois lignes et trois colonnes : un chiffre confiné, sur trois lignes, à trois colonnes communes s’élimine de ces colonnes dans les autres lignes (et inversement).',
       how: 'Trois lignes où le chiffre tient dans (au plus) trois colonnes communes. Élimine-le de ces trois colonnes dans les autres lignes.',
     },
@@ -536,11 +542,13 @@
       while (guard++ < 300) {
         const below = solveBelow(g, cands, lesson.rank);
         if (below) { applyInstance(g, cands, below); continue; }
-        const inst = lesson.detect(g, cands);
-        if (inst && validInstance(inst, solution)) {
-          return { lessonId, grid: g.slice(), givens: g.slice(), cands: cands.slice(), solution, instance: inst };
+        // Techniques plus simples épuisées : la technique visée applicable ICI ?
+        // On exige UNE SEULE instance (sinon l'exercice aurait plusieurs solutions).
+        const all = detectAllInstances(lessonId, g, cands, solution);
+        if (all.length === 1) {
+          return { lessonId, grid: g.slice(), givens: g.slice(), cands: cands.slice(), solution, instance: all[0] };
         }
-        const next = solveFull(g, cands); // techniques de rang ≥ cible
+        const next = solveFull(g, cands); // applique une instance (rang ≥ cible) et on continue
         if (!next) break;                  // grille bloquée même avec tout l'arsenal
         applyInstance(g, cands, next);
       }
@@ -548,9 +556,41 @@
     return null;
   }
 
+  // Toutes les instances de la technique d'une leçon présentes dans la position
+  // (dédoublonnées ; pour un motif vu via plusieurs unités, on fusionne ses
+  // éliminations). Sert au mode entraînement à révéler TOUTES les solutions.
+  function instKey(inst) {
+    if (inst.placements) return 'P:' + inst.placements.map((p) => p.cell + '.' + p.digit).sort().join(',');
+    const cells = (inst.highlight.cells || []).slice().sort((a, b) => a - b).join('.');
+    const ds = (inst.highlight.baseDigits || []).slice().sort((a, b) => a - b).join('.');
+    return inst.technique + '|' + cells + '|' + ds;
+  }
+
+  function detectAllInstances(lessonId, g, cands, solution) {
+    const lesson = LESSON_BY_ID[lessonId];
+    if (!lesson) return [];
+    const raw = [];
+    lesson.detect(g, cands, raw);
+    const map = new Map();
+    for (const inst of raw) {
+      if (solution && !validInstance(inst, solution)) continue;
+      const key = instKey(inst);
+      if (!map.has(key)) { map.set(key, inst); continue; }
+      // même motif vu via une autre unité -> on fusionne les éliminations
+      const ex = map.get(key);
+      if (inst.eliminations && ex.eliminations) {
+        for (const e of inst.eliminations) {
+          if (!ex.eliminations.some((x) => x.cell === e.cell && x.digit === e.digit)) ex.eliminations.push(e);
+        }
+        ex.highlight.elim = ex.eliminations.slice();
+      }
+    }
+    return [...map.values()];
+  }
+
   global.SudokuTech = {
     LESSONS, LESSON_BY_ID,
-    computeCands, applyInstance, solveBelow, generateExercise,
+    computeCands, applyInstance, solveBelow, generateExercise, detectAllInstances,
     detectFullHouse, detectHiddenSingle, detectNakedSingle,
     detectNakedSubset, detectHiddenSubset, detectPointing,
     detectFish, detectYWing, solveFull,
