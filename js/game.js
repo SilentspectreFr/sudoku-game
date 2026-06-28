@@ -373,7 +373,13 @@
         valEl.textContent = '';
         notesEl.style.display = '';
         const set = state.notes[i];
-        for (const sp of notesEl.children) sp.textContent = set.has(+sp.dataset.n) ? sp.dataset.n : '';
+        for (const sp of notesEl.children) {
+          const n = +sp.dataset.n;
+          const has = set.has(n);
+          sp.textContent = has ? n : '';
+          // chiffre actif (sélectionné/verrouillé) mis en évidence dans les annotations
+          sp.classList.toggle('hl', has && active != null && n === active);
+        }
       }
 
       // classes d'état

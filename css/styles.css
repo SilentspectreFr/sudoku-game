@@ -129,6 +129,11 @@ html, body {
   pointer-events: none;
 }
 .note { display: flex; align-items: center; justify-content: center; line-height: 1; }
+.note.hl {
+  color: #fff; font-weight: 800;
+  background: var(--accent); border-radius: 4px;
+  transform: scale(1.06);
+}
 
 /* overlay (pause / fin) */
 .overlay {
