@@ -279,6 +279,112 @@
     return null;
   }
 
+  // 12/14. Poisson (Fish) : X-Wing (size 2) et Swordfish (size 3).
+  //   Un chiffre confiné, sur `size` lignes de base, à `size` colonnes de couverture
+  //   (ou l'inverse) -> on l'élimine de ces colonnes dans les autres lignes.
+  function digitPositions(g, cands, d) {
+    const bd = bit(d);
+    const rowCols = Array.from({ length: 9 }, () => []);
+    const colRows = Array.from({ length: 9 }, () => []);
+    for (let i = 0; i < 81; i++) {
+      if (g[i] || !(cands[i] & bd)) continue;
+      rowCols[rowOf(i)].push(colOf(i));
+      colRows[colOf(i)].push(rowOf(i));
+    }
+    return { rowCols, colRows };
+  }
+
+  function detectFish(g, cands, size) {
+    for (let d = 1; d <= 9; d++) {
+      const pos = digitPositions(g, cands, d);
+      for (const base of ['row', 'col']) {
+        const linePos = base === 'row' ? pos.rowCols : pos.colRows;
+        const baseLines = [];
+        for (let l = 0; l < 9; l++) if (linePos[l].length >= 2 && linePos[l].length <= size) baseLines.push(l);
+        if (baseLines.length < size) continue;
+        for (const combo of combos(baseLines, size)) {
+          const coverSet = new Set();
+          for (const l of combo) linePos[l].forEach((x) => coverSet.add(x));
+          if (coverSet.size !== size) continue;
+          const cover = [...coverSet];
+          const baseSet = new Set(combo);
+          const bd = bit(d);
+          const at = (l, x) => (base === 'row' ? l * 9 + x : x * 9 + l);
+          const elims = [];
+          for (const x of cover) for (let l = 0; l < 9; l++) {
+            if (baseSet.has(l)) continue;
+            const cell = at(l, x);
+            if (!g[cell] && (cands[cell] & bd)) elims.push({ cell, digit: d });
+          }
+          if (!elims.length) continue;
+          const baseCells = [];
+          for (const l of combo) for (const x of linePos[l]) baseCells.push(at(l, x));
+          const lineCells = [];
+          for (const x of cover) for (let l = 0; l < 9; l++) lineCells.push(at(l, x));
+          const baseName = base === 'row' ? 'lignes' : 'colonnes';
+          const coverName = base === 'row' ? 'colonnes' : 'lignes';
+          return {
+            technique: size === 2 ? 'xWing' : 'swordfish',
+            eliminations: elims,
+            highlight: { cells: baseCells, lineCells, baseDigits: [d], elim: elims.slice() },
+            explain: 'Le chiffre ' + d + (size === 2 ? ' forme un X-Wing' : ' forme un Swordfish')
+              + ' : sur les ' + baseName + ' ' + combo.map((l) => l + 1).join(', ')
+              + ', il n’est candidat que dans les ' + coverName + ' ' + cover.map((c) => c + 1).join(', ')
+              + '. Dans la solution, ces ' + baseName + ' y placeront le ' + d + ' (une fois par '
+              + coverName.slice(0, -1) + ') : on élimine donc le ' + d + ' de ces ' + coverName
+              + ' dans les autres ' + baseName + '.',
+          };
+        }
+      }
+    }
+    return null;
+  }
+
+  // 13. Y-Wing (XY-Wing) : pivot bivaleur {A,B} relié à deux pinces {A,C} et {B,C}.
+  //   Le chiffre C s'élimine de toute case voyant les DEUX pinces.
+  function detectYWing(g, cands) {
+    const biv = [];
+    for (let i = 0; i < 81; i++) if (!g[i] && popcount(cands[i]) === 2) biv.push(i);
+    for (const P of biv) {
+      const [a, b] = digitsOf(cands[P]);
+      const peersBiv = PEERS[P].filter((p) => !g[p] && popcount(cands[p]) === 2);
+      for (const Q of peersBiv) {
+        const qd = digitsOf(cands[Q]);
+        const sharedQ = qd.filter((x) => x === a || x === b);
+        if (sharedQ.length !== 1) continue;          // Q partage exactement un chiffre du pivot
+        const x = sharedQ[0];
+        const c = qd.find((z) => z !== x);            // 3e chiffre (Z)
+        if (c === a || c === b) continue;
+        const y = x === a ? b : a;                    // l'autre chiffre du pivot
+        for (const R of peersBiv) {
+          if (R === Q) continue;
+          const rd = digitsOf(cands[R]);
+          if (rd.length !== 2 || !rd.includes(y) || !rd.includes(c)) continue; // R = {y, c}
+          const seesQ = new Set(PEERS[Q]);
+          const bc = bit(c);
+          const elims = [];
+          for (const cell of PEERS[R]) {
+            if (cell === P || cell === Q || cell === R) continue;
+            if (!seesQ.has(cell) || g[cell] || !(cands[cell] & bc)) continue;
+            elims.push({ cell, digit: c });
+          }
+          if (!elims.length) continue;
+          return {
+            technique: 'yWing',
+            eliminations: elims,
+            highlight: { cells: [P, Q, R], baseDigits: [a, b, c], elim: elims.slice() },
+            explain: 'Y-Wing : la case pivot ' + cellName(P) + ' {' + a + ', ' + b + '} voit deux « pinces » '
+              + cellName(Q) + ' {' + x + ', ' + c + '} et ' + cellName(R) + ' {' + y + ', ' + c + '}. '
+              + 'Quelle que soit la valeur du pivot, l’une des deux pinces vaudra ' + c + ' : toute case '
+              + 'voyant les deux pinces ne peut donc pas contenir ' + c + '. On retire le ' + c + ' de '
+              + cellsName(elims.map((e) => e.cell)) + '.',
+          };
+        }
+      }
+    }
+    return null;
+  }
+
   // =========================================================================
   //  SOLVEUR PAR PALIERS (pour amener une position au "prochain pas = T")
   // =========================================================================
@@ -292,6 +398,9 @@
     { rank: 7, fn: (g, c) => detectHiddenSubset(g, c, 2) },
     { rank: 8, fn: (g, c) => detectHiddenSubset(g, c, 3) },
     { rank: 9, fn: (g, c) => detectPointing(g, c, 0) },
+    { rank: 11, fn: (g, c) => detectFish(g, c, 2) },   // X-Wing
+    { rank: 12, fn: detectYWing },                     // Y-Wing
+    { rank: 13, fn: (g, c) => detectFish(g, c, 3) },   // Swordfish
   ];
 
   function solveBelow(g, cands, rT) {
@@ -300,6 +409,11 @@
       const inst = s.fn(g, cands);
       if (inst) return inst;
     }
+    return null;
+  }
+
+  function solveFull(g, cands) {
+    for (const s of SOLVERS) { const inst = s.fn(g, cands); if (inst) return inst; }
     return null;
   }
 
@@ -379,6 +493,24 @@
       summary: 'Même idée que la paire pointante, mais le chiffre occupe trois cases alignées d’un bloc.',
       how: 'Un chiffre confiné à trois cases alignées d’un bloc s’élimine du reste de leur ligne ou colonne.',
     },
+    {
+      id: 'xWing', title: 'X-Wing', level: 'avance', rank: 11,
+      detect: (g, c) => detectFish(g, c, 2), gen: ['expert'],
+      summary: 'Un chiffre candidat dans seulement deux cases sur deux lignes, alignées sur les deux mêmes colonnes, forme un rectangle (X-Wing) : on l’élimine de ces deux colonnes ailleurs (et symétriquement lignes ↔ colonnes).',
+      how: 'Repère un chiffre confiné à 2 cases sur deux lignes, dans les deux mêmes colonnes. Élimine-le de ces colonnes dans les autres lignes (ou l’inverse).',
+    },
+    {
+      id: 'yWing', title: 'Y-Wing', level: 'avance', rank: 12,
+      detect: detectYWing, gen: ['expert'],
+      summary: 'Trois cases à deux candidats formant une chaîne : un pivot {X, Y} relié à deux pinces {X, Z} et {Y, Z}. Le chiffre Z s’élimine de toute case qui voit les deux pinces.',
+      how: 'Trouve une case pivot {X, Y} reliée à deux pinces {X, Z} et {Y, Z}. Le Z disparaît des cases voyant les deux pinces.',
+    },
+    {
+      id: 'swordfish', title: 'Swordfish', level: 'avance', rank: 13,
+      detect: (g, c) => detectFish(g, c, 3), gen: ['expert'],
+      summary: 'La généralisation du X-Wing à trois lignes et trois colonnes : un chiffre confiné, sur trois lignes, à trois colonnes communes s’élimine de ces colonnes dans les autres lignes (et inversement).',
+      how: 'Trois lignes où le chiffre tient dans (au plus) trois colonnes communes. Élimine-le de ces trois colonnes dans les autres lignes.',
+    },
   ];
   const LESSON_BY_ID = {};
   for (const l of LESSONS) LESSON_BY_ID[l.id] = l;
@@ -396,20 +528,21 @@
       const { puzzle, solution } = E.generatePuzzle(diff);
       const g = puzzle.slice();
       const cands = computeCands(g);
-      // appliquer toutes les techniques plus simples jusqu'au point fixe
-      let step;
-      while ((step = solveBelow(g, cands, lesson.rank))) applyInstance(g, cands, step);
-      if (isSolved(g)) continue; // résolu sans la technique visée
-      const inst = lesson.detect(g, cands);
-      if (inst && validInstance(inst, solution)) {
-        return {
-          lessonId,
-          grid: g.slice(),
-          givens: g.slice(),        // la position de départ telle quelle
-          cands: cands.slice(),
-          solution,
-          instance: inst,
-        };
+      // On déroule TOUTE la résolution. À chaque fois que les techniques plus
+      // simples sont épuisées, on regarde si la technique visée est le prochain
+      // pas logique ; sinon on avance d'un cran (technique de rang ≥ cible) et on
+      // continue — ainsi on attrape même les techniques rares plus loin dans la grille.
+      let guard = 0;
+      while (guard++ < 300) {
+        const below = solveBelow(g, cands, lesson.rank);
+        if (below) { applyInstance(g, cands, below); continue; }
+        const inst = lesson.detect(g, cands);
+        if (inst && validInstance(inst, solution)) {
+          return { lessonId, grid: g.slice(), givens: g.slice(), cands: cands.slice(), solution, instance: inst };
+        }
+        const next = solveFull(g, cands); // techniques de rang ≥ cible
+        if (!next) break;                  // grille bloquée même avec tout l'arsenal
+        applyInstance(g, cands, next);
       }
     }
     return null;
@@ -420,6 +553,7 @@
     computeCands, applyInstance, solveBelow, generateExercise,
     detectFullHouse, detectHiddenSingle, detectNakedSingle,
     detectNakedSubset, detectHiddenSubset, detectPointing,
+    detectFish, detectYWing, solveFull,
     cellName, unitName, digitsOf,
     UNIT_DEFS, PEERS,
   };

@@ -31,9 +31,8 @@ python3 -m http.server 8000
 Une page dédiée (`train.html`) enseigne les techniques de résolution : pour chaque technique,
 un **exercice réel** est généré (le moteur de détection trouve une position où la technique est
 le prochain pas logique), avec **indice**, **solution** et **explication**. Techniques couvertes
-(vague 1) : dernière case libre/restante, dernier chiffre possible, singletons nus/cachés,
-paires/triplets nus et cachés, paires/triplets pointants. *(Vague 2 à venir : X-Wing, Y-Wing,
-Swordfish.)*
+(14) : dernière case libre/restante, dernier chiffre possible, singletons nus/cachés,
+paires/triplets nus et cachés, paires/triplets pointants, **X-Wing, Y-Wing, Swordfish**.
 
 ## Structure
 

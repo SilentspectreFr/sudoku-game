@@ -9,6 +9,7 @@
   const LEVELS = [
     { key: 'debutant', label: 'Pour débuter', hint: 'Les réflexes de base, sans annotations.' },
     { key: 'technique', label: 'Techniques', hint: 'Avec les annotations (candidats).' },
+    { key: 'avance', label: 'Techniques avancées', hint: 'Les structures : X-Wing, Y-Wing, Swordfish.' },
   ];
 
   let els = {};

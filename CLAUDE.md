@@ -31,9 +31,12 @@ Pas de modules ES → on peut ouvrir `index.html` directement. Sinon :
   solution). NE JAMAIS livrer un détecteur sans cette validation.
 - `js/trainer.js` — UI du mode entraînement (liste, plateau, indice/solution/explication).
 
-## Mode entraînement — vagues
-Vague 1 (faite) : 11 techniques de base jusqu'aux pointants. Vague 2 (à faire) : X-Wing, Y-Wing,
-Swordfish (ajouter le détecteur + l'entrée `LESSONS` ; même discipline de test Node).
+## Mode entraînement — techniques
+14 techniques couvertes : 11 de base (jusqu'aux pointants) + X-Wing / Y-Wing / Swordfish.
+Pour en ajouter une : écrire le détecteur, l'ajouter à `SOLVERS` (avec son rang de difficulté) et
+une entrée `LESSONS` ; puis **valider en Node** (générer N exercices, vérifier chaque instance
+contre la solution). La génération déroule toute la résolution et capture la position où la
+technique visée est le prochain pas logique (gère les techniques rares comme le Swordfish).
 
 ## Conventions
 - Pas d'ES modules (scripts `<script>` classiques) pour garder l'ouverture `file://` et un
