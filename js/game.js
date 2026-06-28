@@ -37,6 +37,10 @@
   // ---- Helpers --------------------------------------------------------------
   const valueAt = (i) => state.givens[i] || state.values[i];
   const isGiven = (i) => state.givens[i] !== 0;
+  // une saisie joueur CORRECTE se verrouille comme un indice (ni modifiable ni effaçable) ;
+  // une saisie fausse reste modifiable pour pouvoir se corriger.
+  const isCorrect = (i) => state.values[i] !== 0 && state.values[i] === state.solution[i];
+  const isLocked = (i) => isGiven(i) || isCorrect(i);
   const rowOf = (i) => (i / 9) | 0;
   const colOf = (i) => i % 9;
   const boxOf = (i) => ((rowOf(i) / 3) | 0) * 3 + ((colOf(i) / 3) | 0);
@@ -108,7 +112,7 @@
   }
 
   function eraseCell(i) {
-    if (isGiven(i)) { render(); return; }
+    if (isLocked(i)) { render(); return; }
     state.values[i] = 0;
     state.notes[i].clear();
     render();
@@ -129,7 +133,7 @@
     state.selectedNumber = d;
 
     // Méthode "case -> chiffre" : une case est sélectionnée et modifiable.
-    if (state.selectedCell != null && !isGiven(state.selectedCell) && !state.eraser) {
+    if (state.selectedCell != null && !isLocked(state.selectedCell) && !state.eraser) {
       applyDigit(state.selectedCell, d);
       return;
     }
@@ -148,7 +152,7 @@
 
   // Écriture effective dans une case (valeur ou annotation selon le mode crayon).
   function applyDigit(i, d) {
-    if (isGiven(i)) return;
+    if (isLocked(i)) return;
     state.selectedCell = i;
 
     if (state.pencil) {
