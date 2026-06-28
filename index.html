@@ -11,126 +11,43 @@
   <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body>
-  <div class="app">
-
-    <header class="topbar">
-      <div class="brand">Sudoku</div>
-      <button id="new-game" class="btn-new" type="button">Nouvelle partie</button>
-    </header>
-
-    <div class="status-bar">
-      <div class="stat difficulty" id="difficulty-btn">
-        <span class="stat-label">Difficulté</span>
-        <span class="stat-value" id="difficulty-value">Facile ▾</span>
-        <ul class="difficulty-menu" id="difficulty-menu" hidden>
-          <li data-diff="facile">Facile</li>
-          <li data-diff="moyen">Moyen</li>
-          <li data-diff="difficile">Difficile</li>
-          <li data-diff="expert">Expert</li>
-        </ul>
-      </div>
-      <div class="stat">
-        <span class="stat-label">Erreurs</span>
-        <span class="stat-value" id="errors-value">0/3</span>
-      </div>
-      <div class="stat time">
-        <span class="stat-label">Temps</span>
-        <span class="stat-value time-row">
-          <span id="time-value">00:00</span>
-          <button id="pause-btn" class="pause-btn" type="button" aria-label="Pause">❚❚</button>
-        </span>
-      </div>
+  <div class="home">
+    <div class="home-head">
+      <div class="home-logo">Sudoku</div>
+      <p class="home-tagline">Joue, puis monte en niveau.</p>
     </div>
 
-    <div class="board-wrap">
-      <div class="board" id="board"></div>
-
-      <div class="overlay" id="overlay" hidden>
-        <div class="overlay-card">
-          <div class="overlay-title" id="overlay-title">Pause</div>
-          <div class="overlay-sub" id="overlay-sub"></div>
-          <div class="overlay-actions">
-            <button id="overlay-resume" class="btn-primary" type="button">Reprendre</button>
-            <button id="overlay-restart" class="btn-ghost" type="button" hidden>Recommencer</button>
-            <button id="overlay-new" class="btn-primary" type="button" hidden>Nouvelle partie</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="loading" id="loading" hidden>
-        <div class="spinner"></div>
-        <span>Génération…</span>
-      </div>
-    </div>
-
-    <div class="toolbar">
-      <button id="tool-restart" class="tool" type="button">
-        <span class="tool-ico" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 4v4h4" />
+    <nav class="home-cards">
+      <a class="home-card" href="play.html">
+        <span class="home-card-ico" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <path d="M9 3v18M15 3v18M3 9h18M3 15h18" />
           </svg>
         </span>
-        <span class="tool-label">Recommencer</span>
-      </button>
-
-      <button id="tool-erase" class="tool" type="button">
-        <span class="tool-ico" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M4 14.5 9.5 9 15 14.5 11.5 18H8z" /><path d="m9.5 9 5-5 5 5-5 5" /><path d="M5 20h14" />
-          </svg>
+        <span class="home-card-body">
+          <span class="home-card-title">Partie classique</span>
+          <span class="home-card-sub">Une grille, 4 niveaux, chrono et annotations.</span>
         </span>
-        <span class="tool-label">Gomme</span>
-      </button>
+        <span class="home-card-arrow" aria-hidden="true">›</span>
+      </a>
 
-      <button id="tool-pencil" class="tool" type="button">
-        <span class="tool-badge" id="pencil-badge">OFF</span>
-        <span class="tool-ico" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
-          </svg>
-        </span>
-        <span class="tool-label">Crayon</span>
-      </button>
-
-      <button id="tool-bulb" class="tool" type="button">
-        <span class="tool-ico" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <a class="home-card" href="train.html">
+        <span class="home-card-ico" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <path d="M9 18h6" /><path d="M10 21h4" />
             <path d="M12 3a6 6 0 0 0-4 10.5c.8.8 1.3 1.5 1.5 2.5h5c.2-1 .7-1.7 1.5-2.5A6 6 0 0 0 12 3Z" />
           </svg>
         </span>
-        <span class="tool-label">Annotations</span>
-      </button>
-    </div>
+        <span class="home-card-body">
+          <span class="home-card-title">Mode entraînement</span>
+          <span class="home-card-sub">Apprends les techniques de résolution, exercice par exercice.</span>
+        </span>
+        <span class="home-card-arrow" aria-hidden="true">›</span>
+      </a>
+    </nav>
 
-    <div class="numpad" id="numpad">
-      <button class="num" type="button" data-d="1">1</button>
-      <button class="num" type="button" data-d="2">2</button>
-      <button class="num" type="button" data-d="3">3</button>
-      <button class="num" type="button" data-d="4">4</button>
-      <button class="num" type="button" data-d="5">5</button>
-      <button class="num" type="button" data-d="6">6</button>
-      <button class="num" type="button" data-d="7">7</button>
-      <button class="num" type="button" data-d="8">8</button>
-      <button class="num" type="button" data-d="9">9</button>
-    </div>
-
-    <p class="hint">Astuce : appui <strong>long</strong> sur un chiffre pour le verrouiller, puis tape les cases.</p>
-
-    <div class="modal" id="modal" hidden>
-      <div class="modal-card">
-        <p id="modal-text">Recommencer la partie ?</p>
-        <div class="modal-actions">
-          <button id="modal-cancel" class="btn-ghost" type="button">Annuler</button>
-          <button id="modal-ok" class="btn-primary" type="button">Confirmer</button>
-        </div>
-      </div>
-    </div>
-
+    <p class="home-foot">Conçu pour le mobile · aucune installation.</p>
   </div>
-
-  <script src="js/sudoku-engine.js"></script>
-  <script src="js/game.js"></script>
-  <script src="js/main.js"></script>
 </body>
 </html>

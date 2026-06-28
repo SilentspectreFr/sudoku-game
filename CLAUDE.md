@@ -12,13 +12,28 @@ puis le push déploiera. `netlify.toml` est déjà prêt avec `publish = "."`.)
 Pas de modules ES → on peut ouvrir `index.html` directement. Sinon :
 `python3 -m http.server 8000` puis http://localhost:8000
 
+## Pages
+- `index.html` = **home** (Partie classique / Mode entraînement).
+- `play.html` = la partie classique. `train.html` = le mode entraînement.
+
 ## Architecture
 - `js/sudoku-engine.js` — moteur **pur** (DOM-free, testable en Node) : génération de grille
   complète, compteur de solutions (unicité), creusage, graduation de difficulté. C'est le cœur
   correct du jeu — toute modif ici se **re-teste** : `node -e "require('./js/sudoku-engine.js');
   console.table(SudokuEngine.selfTest())"`.
-- `js/game.js` — état de partie + rendu + interactions (le gros du code UI).
-- `js/main.js` — bootstrap + auto-test console.
+- `js/game.js` — partie classique : état + rendu + interactions (le gros du code UI).
+- `js/main.js` — bootstrap du jeu + auto-test console.
+- `js/techniques.js` — **moteur de TECHNIQUES** (PUR, testable en Node) : un détecteur par
+  technique (full house, singles, paires/triplets nus & cachés, pointants… puis X-Wing/Y-Wing/
+  Swordfish en vague 2) + génération d'exercices où la technique visée est le **prochain pas
+  logique**. Toute modif d'un détecteur se **re-teste en Node** : générer N exercices et vérifier
+  que chaque instance est **valide contre la solution** (placement = solution ; élimination ≠
+  solution). NE JAMAIS livrer un détecteur sans cette validation.
+- `js/trainer.js` — UI du mode entraînement (liste, plateau, indice/solution/explication).
+
+## Mode entraînement — vagues
+Vague 1 (faite) : 11 techniques de base jusqu'aux pointants. Vague 2 (à faire) : X-Wing, Y-Wing,
+Swordfish (ajouter le détecteur + l'entrée `LESSONS` ; même discipline de test Node).
 
 ## Conventions
 - Pas d'ES modules (scripts `<script>` classiques) pour garder l'ouverture `file://` et un

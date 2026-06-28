@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#f4f6fb" />
+  <title>Sudoku — Mode entraînement</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="app trainer">
+
+    <header class="topbar">
+      <a class="brand brand-link" id="top-back" href="index.html">‹ Entraînement</a>
+    </header>
+
+    <!-- Vue liste des techniques -->
+    <section id="view-list">
+      <p class="train-intro">Chaque technique vient avec un <strong>exercice réel</strong> : à toi de la
+        repérer, puis affiche l’indice, la solution et l’explication.</p>
+      <div id="lesson-groups"></div>
+    </section>
+
+    <!-- Vue d'une leçon -->
+    <section id="view-lesson" hidden>
+      <button id="back-list" class="back-list" type="button">‹ Toutes les techniques</button>
+
+      <div class="lesson-head">
+        <span class="lesson-level" id="lesson-level"></span>
+        <h2 class="lesson-title" id="lesson-title"></h2>
+      </div>
+      <p class="lesson-summary" id="lesson-summary"></p>
+      <p class="lesson-how" id="lesson-how"></p>
+
+      <div class="board-wrap">
+        <div class="board train-board" id="train-board"></div>
+        <div class="loading" id="train-loading" hidden>
+          <div class="spinner"></div><span>Recherche d’un exemple…</span>
+        </div>
+      </div>
+
+      <div class="explain" id="explain" hidden></div>
+
+      <div class="train-actions">
+        <button id="btn-hint" class="btn-ghost" type="button">Indice</button>
+        <button id="btn-reveal" class="btn-primary" type="button">Voir la solution</button>
+        <button id="btn-next" class="btn-ghost" type="button">Nouvel exercice</button>
+      </div>
+    </section>
+
+  </div>
+
+  <script src="js/sudoku-engine.js"></script>
+  <script src="js/techniques.js"></script>
+  <script src="js/trainer.js"></script>
+</body>
+</html>

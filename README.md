@@ -26,14 +26,27 @@ python3 -m http.server 8000
   **Ampoule** (remplit / efface toutes les annotations possibles).
 - Reprise de partie automatique (localStorage).
 
+## Mode entraînement
+
+Une page dédiée (`train.html`) enseigne les techniques de résolution : pour chaque technique,
+un **exercice réel** est généré (le moteur de détection trouve une position où la technique est
+le prochain pas logique), avec **indice**, **solution** et **explication**. Techniques couvertes
+(vague 1) : dernière case libre/restante, dernier chiffre possible, singletons nus/cachés,
+paires/triplets nus et cachés, paires/triplets pointants. *(Vague 2 à venir : X-Wing, Y-Wing,
+Swordfish.)*
+
 ## Structure
 
 ```
-index.html            structure de la page
-css/styles.css        styles mobile-first
+index.html            home (Partie classique / Mode entraînement)
+play.html             la partie classique
+train.html            le mode entraînement
+css/styles.css        styles mobile-first (partagés)
 js/sudoku-engine.js   moteur pur (génération, unicité, difficulté) — testable en Node
-js/game.js            état de partie, rendu, interactions
-js/main.js            bootstrap + auto-test moteur (console)
+js/game.js            partie classique : état, rendu, interactions
+js/main.js            bootstrap du jeu + auto-test moteur (console)
+js/techniques.js      moteur de TECHNIQUES (détecteurs + génération d'exercices) — testable en Node
+js/trainer.js         mode entraînement : liste, exercices, indice/solution
 netlify.toml          publish = "."
 ```
 
