@@ -116,11 +116,13 @@
     const inst = ex.instance;
     const hl = inst.highlight;
     const phase = current.phase; // plain | hint | reveal
-    const show = phase === 'hint' || phase === 'reveal';
+    const reveal = phase === 'reveal';
 
     const baseCells = new Set(hl.cells || []);
-    const unitCells = new Set(show ? (hl.unitCells || []) : []);
-    const lineCells = new Set(show ? (hl.lineCells || []) : []);
+    // Le surlignage (cadre bleu, notes mises en avant, teintes d'unité) n'apparaît
+    // QU'À LA SOLUTION. L'indice reste purement textuel, sans rien révéler sur la grille.
+    const unitCells = new Set(reveal ? (hl.unitCells || []) : []);
+    const lineCells = new Set(reveal ? (hl.lineCells || []) : []);
     const baseDigits = new Set(hl.baseDigits || (inst.placements ? inst.placements.map((p) => p.digit) : []));
     const placeMap = {}; if (inst.placements) inst.placements.forEach((p) => placeMap[p.cell] = p.digit);
     const elimSet = new Set((phase === 'reveal' && inst.eliminations ? inst.eliminations : []).map((e) => e.cell * 10 + e.digit));
@@ -151,14 +153,14 @@
           const has = !!(cm & (1 << (n - 1)));
           sp.textContent = has ? n : '';
           sp.className = 'note';
-          if (has && baseCells.has(i) && baseDigits.has(n)) sp.classList.add('hl');
+          if (reveal && has && baseCells.has(i) && baseDigits.has(n)) sp.classList.add('hl');
           if (has && elimSet.has(i * 10 + n)) sp.classList.add('elim');
         }
       }
 
       if (unitCells.has(i)) cell.classList.add('hl-unit');
       if (lineCells.has(i)) cell.classList.add('hl-line');
-      if (show && baseCells.has(i)) cell.classList.add('base');
+      if (reveal && baseCells.has(i)) cell.classList.add('base');
     }
   }
 
@@ -182,10 +184,12 @@
   function hintText(inst) {
     const hl = inst.highlight;
     if (inst.placements) {
-      return 'Concentre-toi sur la zone surlignée : une case n’a plus qu’une possibilité.';
+      return 'Une case n’a plus qu’une seule valeur possible : balaie les lignes, colonnes et blocs pour la repérer.';
     }
     const ds = (hl.baseDigits || []).join(', ');
-    return 'Observe l’unité surlignée et les chiffres {' + ds + '} dans les cases mises en avant.';
+    return ds
+      ? 'La technique porte ici sur le(s) chiffre(s) {' + ds + '} : cherche le motif correspondant dans la grille, sans regarder la solution.'
+      : 'Cherche le motif de la technique dans la grille, sans regarder la solution.';
   }
 
   // ---- Init -----------------------------------------------------------------
