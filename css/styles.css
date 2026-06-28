@@ -94,6 +94,8 @@ html, body {
   border-radius: 10px;
   overflow: hidden;
   touch-action: manipulation;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
   user-select: none;
 }
 .cell {
@@ -199,7 +201,10 @@ html, body {
   aspect-ratio: 1 / 1; border-radius: 12px; cursor: pointer;
   box-shadow: var(--shadow);
   display: flex; align-items: center; justify-content: center;
-  touch-action: manipulation; user-select: none;
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 .num:active { transform: translateY(1px); }
 .num.locked { background: var(--accent); color: #fff; }
