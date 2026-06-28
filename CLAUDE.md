@@ -49,5 +49,13 @@ technique visée est le prochain pas logique (gère les techniques rares comme l
 - Mobile-first : Pointer Events, cibles tactiles larges, viewport non-zoomable.
 - Difficulté = nombre d'indices + résolubilité par « singles » (voir `DIFFICULTIES` dans le moteur).
 
+## PWA (installable + offline)
+Le jeu est une **PWA** : `manifest.json` (lié dans les 3 pages), `sw.js` (service worker :
+pré-cache du jeu, navigations en network-first, repli cache hors-ligne), icônes dans `icons/`.
+Les icônes sont **générées en pur JS** par `node scripts/make-icons.js` (zéro dépendance, zlib).
+⚠️ **Bump `CACHE` dans `sw.js`** (`sudoku-v1` → `-v2`…) à chaque déploiement qui change un fichier,
+sinon les visiteurs gardent l'ancienne version en cache. iOS : installation manuelle via
+*Partager → Sur l'écran d'accueil* (pas de bannière auto).
+
 ## Hors périmètre (idées futures)
-PWA/offline, undo fin, mode Killer, records persistés.
+undo fin, mode Killer, records persistés.
