@@ -49,13 +49,23 @@ technique visée est le prochain pas logique (gère les techniques rares comme l
 - Mobile-first : Pointer Events, cibles tactiles larges, viewport non-zoomable.
 - Difficulté = nombre d'indices + résolubilité par « singles » (voir `DIFFICULTIES` dans le moteur).
 
+## Versioning (source unique) — IMPORTANT pour la maintenance
+`js/version.js` définit **`APP_VERSION`** (semver `MAJOR.MINOR.PATCH`). C'est le **seul** endroit
+à modifier pour publier. Ce numéro :
+- s'**affiche** en pied de page (tout élément `[data-app-version]` est rempli par `version.js`) ;
+- nomme le **cache du service worker** : `sw.js` fait `importScripts('./js/version.js')` et pose
+  `CACHE = 'sudoku-v' + APP_VERSION`. Bumper la version **renomme le cache automatiquement** →
+  les visiteurs reçoivent la nouvelle version. Plus de bump manuel du cache (l'ancien piège).
+
+⚠️ **À chaque release qui change un fichier livré : bumper `APP_VERSION` dans `js/version.js`**,
+puis déployer (`netlify deploy --prod --dir .`). C'est tout.
+
 ## PWA (installable + offline)
 Le jeu est une **PWA** : `manifest.json` (lié dans les 3 pages), `sw.js` (service worker :
 pré-cache du jeu, navigations en network-first, repli cache hors-ligne), icônes dans `icons/`.
 Les icônes sont **générées en pur JS** par `node scripts/make-icons.js` (zéro dépendance, zlib).
-⚠️ **Bump `CACHE` dans `sw.js`** (`sudoku-v1` → `-v2`…) à chaque déploiement qui change un fichier,
-sinon les visiteurs gardent l'ancienne version en cache. iOS : installation manuelle via
-*Partager → Sur l'écran d'accueil* (pas de bannière auto).
+Mise à jour côté visiteur = recharger / fermer-rouvrir la PWA (le SW s'actualise au lancement
+suivant). iOS : installation manuelle via *Partager → Sur l'écran d'accueil* (pas de bannière auto).
 
 ## Hors périmètre (idées futures)
 undo fin, mode Killer, records persistés.

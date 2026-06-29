@@ -2,8 +2,13 @@
 // Stratégie : pré-cache des fichiers du jeu ; navigations en network-first
 // (pour voir les mises à jour en ligne) avec repli cache hors-ligne ; reste
 // en cache-first. Les polices Google sont mises en cache à la volée.
-// ⚠️ Bump CACHE à chaque déploiement qui change des fichiers (sinon vieux cache).
-const CACHE = 'sudoku-v4';
+//
+// Le nom du cache dérive de la SOURCE UNIQUE js/version.js : bumper APP_VERSION
+// là-bas renomme ce cache et déclenche la mise à jour. NE PAS coder le numéro ici.
+// (Les navigateurs modernes re-vérifient les scripts importés à chaque update,
+//  donc un changement de version.js suffit à mettre le service worker à jour.)
+importScripts('./js/version.js');
+const CACHE = 'sudoku-v' + self.APP_VERSION;
 
 const CORE = [
   './',
@@ -11,6 +16,7 @@ const CORE = [
   './play.html',
   './train.html',
   './css/styles.css',
+  './js/version.js',
   './js/sudoku-engine.js',
   './js/game.js',
   './js/main.js',

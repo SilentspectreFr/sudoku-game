@@ -213,6 +213,9 @@ html, body {
 
 .hint { text-align: center; color: var(--ink-soft); font-size: .82rem; font-weight: 600; margin: 0; }
 
+/* Pied de version (source unique : js/version.js) */
+.app-version { text-align: center; color: var(--ink-soft); opacity: .55; font-size: .7rem; font-weight: 600; letter-spacing: .02em; margin: 12px 0 0; }
+
 /* ---- Panneau d'astuce (partie classique) ---- */
 .hint-panel { margin-top: 10px; }
 .hint-sub { display: inline-block; margin-top: 4px; color: var(--ink-soft); font-weight: 600; }
