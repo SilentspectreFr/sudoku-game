@@ -71,13 +71,13 @@
     </div>
 
     <div class="toolbar">
-      <button id="tool-restart" class="tool" type="button">
+      <button id="tool-undo" class="tool" type="button">
         <span class="tool-ico" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 4v4h4" />
+            <path d="M9 14 4 9l5-5" /><path d="M4 9h11a5 5 0 0 1 0 10h-4" />
           </svg>
         </span>
-        <span class="tool-label">Recommencer</span>
+        <span class="tool-label">Annuler</span>
       </button>
 
       <button id="tool-erase" class="tool" type="button">
@@ -99,6 +99,16 @@
         <span class="tool-label">Crayon</span>
       </button>
 
+      <button id="tool-autonotes" class="tool" type="button">
+        <span class="tool-ico" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+            <text x="3" y="9" font-size="8" font-weight="800" fill="currentColor" stroke="none">A</text>
+          </svg>
+        </span>
+        <span class="tool-label">Auto</span>
+      </button>
+
       <button id="tool-bulb" class="tool" type="button">
         <span class="tool-ico" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -106,7 +116,7 @@
             <path d="M12 3a6 6 0 0 0-4 10.5c.8.8 1.3 1.5 1.5 2.5h5c.2-1 .7-1.7 1.5-2.5A6 6 0 0 0 12 3Z" />
           </svg>
         </span>
-        <span class="tool-label">Annotations</span>
+        <span class="tool-label">Astuce</span>
       </button>
     </div>
 
@@ -120,6 +130,15 @@
       <button class="num" type="button" data-d="7">7</button>
       <button class="num" type="button" data-d="8">8</button>
       <button class="num" type="button" data-d="9">9</button>
+    </div>
+
+    <div class="explain hint-panel" id="hint-panel" hidden>
+      <div id="hint-body"></div>
+      <div class="hint-actions">
+        <button id="hint-more" class="btn-ghost" type="button">Voir la solution</button>
+        <button id="hint-place" class="btn-primary" type="button" hidden>Placer</button>
+        <button id="hint-close" class="btn-ghost" type="button">Fermer</button>
+      </div>
     </div>
 
     <p class="hint">Astuce : appui <strong>long</strong> sur un chiffre pour le verrouiller, puis tape les cases.</p>
@@ -137,6 +156,7 @@
   </div>
 
   <script src="js/sudoku-engine.js"></script>
+  <script src="js/techniques.js"></script>
   <script src="js/game.js"></script>
   <script src="js/main.js"></script>
 </body>

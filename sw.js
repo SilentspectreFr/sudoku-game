@@ -3,7 +3,7 @@
 // (pour voir les mises à jour en ligne) avec repli cache hors-ligne ; reste
 // en cache-first. Les polices Google sont mises en cache à la volée.
 // ⚠️ Bump CACHE à chaque déploiement qui change des fichiers (sinon vieux cache).
-const CACHE = 'sudoku-v1';
+const CACHE = 'sudoku-v4';
 
 const CORE = [
   './',

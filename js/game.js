@@ -33,6 +33,9 @@
   let cellEls = [];      // 81 éléments de cellule
   let timerId = null;
   let confirmCb = null;  // callback du modal de confirmation
+  let hint = { data: null, phase: 0 };  // astuce en cours (éphémère, non persisté)
+  const history = [];                   // pile d'annulation (snapshots, éphémère)
+  const HISTORY_MAX = 80;
 
   // ---- Helpers --------------------------------------------------------------
   const valueAt = (i) => state.givens[i] || state.values[i];
@@ -72,6 +75,8 @@
       state.seconds = 0;
       state.paused = false;
       state.status = 'playing';
+      dismissHint();
+      clearHistory();
       hideOverlay();
       showLoading(false);
       startTimer();
@@ -92,6 +97,8 @@
     state.selectedNumber = null;
     state.status = 'playing';
     state.paused = false;
+    dismissHint();
+    clearHistory();
     hideOverlay();
     startTimer();
     render();
@@ -112,7 +119,10 @@
   }
 
   function eraseCell(i) {
+    dismissHint();
     if (isLocked(i)) { render(); return; }
+    if (state.values[i] === 0 && state.notes[i].size === 0) { render(); return; }
+    pushHistory();
     state.values[i] = 0;
     state.notes[i].clear();
     render();
@@ -152,11 +162,13 @@
 
   // Écriture effective dans une case (valeur ou annotation selon le mode crayon).
   function applyDigit(i, d) {
+    dismissHint();
     if (isLocked(i)) return;
     state.selectedCell = i;
 
     if (state.pencil) {
       if (state.values[i] !== 0) return;       // pas d'annotation sur une case remplie
+      pushHistory();
       if (state.notes[i].has(d)) state.notes[i].delete(d);
       else state.notes[i].add(d);
       render();
@@ -166,12 +178,14 @@
 
     // Mode valeur
     if (state.values[i] === d) {               // re-poser la même valeur = effacer
+      pushHistory();
       state.values[i] = 0;
       render();
       save();
       return;
     }
 
+    pushHistory();
     const wasWrong = state.values[i] !== 0 && state.values[i] !== state.solution[i];
     state.values[i] = d;
     state.notes[i].clear();
@@ -201,6 +215,47 @@
     return true;
   }
 
+  // ---- Annulation (retour en arrière) --------------------------------------
+  // Snapshot de tout ce qu'un coup peut modifier : valeurs, notes, erreurs…
+  function snapshot() {
+    return {
+      values: state.values.slice(),
+      notes: state.notes.map((s) => [...s]),
+      errors: state.errors,
+      status: state.status,
+      autoNotes: state.autoNotes,
+      selectedCell: state.selectedCell,
+    };
+  }
+  // À appeler AVANT toute mutation annulable (pose, effacement, notes auto).
+  function pushHistory() {
+    history.push(snapshot());
+    if (history.length > HISTORY_MAX) history.shift();
+    updateUndoBtn();
+  }
+  function clearHistory() { history.length = 0; updateUndoBtn(); }
+  function updateUndoBtn() {
+    if (els.toolUndo) els.toolUndo.disabled = history.length === 0;
+  }
+  function undo() {
+    if (!history.length) return;
+    dismissHint();
+    const s = history.pop();
+    state.values = s.values.slice();
+    state.notes = s.notes.map((a) => new Set(a));
+    state.errors = s.errors;
+    state.autoNotes = s.autoNotes;
+    state.selectedCell = s.selectedCell;
+    state.status = s.status;
+    if (state.status === 'playing') {           // annuler une fin de partie réactive le jeu
+      hideOverlay();
+      if (!state.paused && !timerId) startTimer();
+    }
+    render();
+    save();
+    updateUndoBtn();
+  }
+
   // ---- Outils (barre du bas) -----------------------------------------------
   function toggleEraser() {
     state.eraser = !state.eraser;
@@ -213,8 +268,9 @@
     render();
   }
 
-  // Ampoule : remplit toutes les annotations possibles, ou les efface si déjà actif.
+  // Remplit toutes les annotations possibles, ou les efface si déjà actif.
   function toggleAutoNotes() {
+    pushHistory();
     if (state.autoNotes) {
       for (let i = 0; i < 81; i++) state.notes[i].clear();
       state.autoNotes = false;
@@ -241,6 +297,149 @@
       g[i] = (state.givens[i] || (state.values[i] && state.values[i] === state.solution[i])) ? v : 0;
     }
     return g;
+  }
+
+  // ---- Astuce (moteur de techniques) ---------------------------------------
+  // Libellé "LxCy" d'une case (réutilise le moteur de techniques, repli local).
+  function cellLabel(i) {
+    const T = global.SudokuTech;
+    return (T && T.cellName) ? T.cellName(i) : ('L' + (rowOf(i) + 1) + 'C' + (colOf(i) + 1));
+  }
+
+  // Titre lisible d'une technique ; cas particulier du singleton caché (boîte vs global).
+  function hintTitle(data) {
+    const T = global.SudokuTech;
+    if (data.technique === 'hiddenSingle') {
+      return data.scope === 'box' ? 'Dernière case restante' : 'Singleton caché';
+    }
+    const lesson = (T && T.LESSON_BY_ID) ? T.LESSON_BY_ID[data.technique] : null;
+    return (lesson && lesson.title) || 'Technique logique';
+  }
+
+  // Déroule les techniques les plus simples jusqu'au PROCHAIN placement jouable.
+  // Les éliminations pures (utiles seulement avec les notes) sont appliquées en
+  // silence : on garantit toujours un coup à poser. Renvoie null si bloqué.
+  function nextPlacementHint() {
+    const T = global.SudokuTech;
+    if (!T) return null;
+    const g = buildWorkingGrid();
+    const cands = T.computeCands(g);
+    for (let guard = 0; guard < 200; guard++) {
+      const inst = T.solveFull(g, cands);
+      if (!inst) return null;
+      if (inst.placements && inst.placements.length) {
+        const p = inst.placements[0];
+        if (p.digit !== state.solution[p.cell]) return null;   // garde-fou anti-bug détecteur
+        return { kind: 'place', cell: p.cell, digit: p.digit,
+                 technique: inst.technique, scope: inst.scope, explain: inst.explain };
+      }
+      T.applyInstance(g, cands, inst);                          // élimination : on applique et on continue
+    }
+    return null;
+  }
+
+  // Première case fausse posée par le joueur (hors indices), ou null.
+  function findMistake() {
+    for (let i = 0; i < 81; i++) {
+      if (state.givens[i] === 0 && state.values[i] !== 0 && state.values[i] !== state.solution[i]) return i;
+    }
+    return null;
+  }
+
+  // Repli quand aucune technique connue ne s'applique : un placement sûr depuis la solution.
+  function fallbackPlacement() {
+    for (let i = 0; i < 81; i++) {
+      if (!state.givens[i] && !state.values[i]) return { cell: i, digit: state.solution[i] };
+    }
+    return null;
+  }
+
+  // Entrée de l'astuce (clic sur l'ampoule).
+  function showHint() {
+    if (state.status !== 'playing' || state.paused) return;
+
+    // 1) Une erreur au plateau fausse tout : on la signale d'abord.
+    const m = findMistake();
+    if (m != null) {
+      state.eraser = false; state.lockedNumber = null;
+      selectCell(m);
+      hint = { data: { kind: 'mistake', cell: m }, phase: 1 };
+      renderHintPanel();
+      return;
+    }
+
+    // 2) Prochain coup jouable + technique qui le débloque.
+    const data = nextPlacementHint();
+    if (data) { hint = { data, phase: 1 }; renderHintPanel(); return; }
+
+    // 3) Repli : indice direct depuis la solution.
+    const fb = fallbackPlacement();
+    if (fb) {
+      state.eraser = false; state.lockedNumber = null;
+      selectCell(fb.cell);
+      hint = { data: { kind: 'direct', cell: fb.cell, digit: fb.digit }, phase: 2 };
+      renderHintPanel();
+      return;
+    }
+
+    hint = { data: { kind: 'none' }, phase: 1 };
+    renderHintPanel();
+  }
+
+  // Passe de la phase 1 (nom) à la phase 2 (solution concrète + surlignage).
+  function revealHint() {
+    if (!hint.data || hint.data.kind !== 'place') return;
+    hint.phase = 2;
+    state.eraser = false; state.lockedNumber = null;
+    selectCell(hint.data.cell);
+    renderHintPanel();
+  }
+
+  // Pose le chiffre proposé (placement ou indice direct), sans compter d'erreur.
+  function placeHint() {
+    const d = hint.data;
+    if (!d || (d.kind !== 'place' && d.kind !== 'direct')) return;
+    const cell = d.cell, digit = d.digit;
+    if (digit !== state.solution[cell]) return;            // garde-fou
+    state.eraser = false; state.lockedNumber = null; state.pencil = false;
+    selectCell(cell);
+    applyDigit(cell, digit);                               // dismissHint() en tête : ferme le panneau
+  }
+
+  function dismissHint() {
+    hint = { data: null, phase: 0 };
+    if (els.hintPanel) els.hintPanel.hidden = true;
+  }
+
+  function renderHintPanel() {
+    const d = hint.data;
+    if (!d || !els.hintPanel) return;
+    let html = '', showMore = false, showPlace = false;
+
+    if (d.kind === 'mistake') {
+      html = '<strong>Erreur —</strong> tu as une erreur en <strong>' + cellLabel(d.cell) +
+             '</strong>. Corrige-la d\'abord, puis redemande une astuce.';
+    } else if (d.kind === 'none') {
+      html = '<strong>Astuce —</strong> la grille est déjà complète.';
+    } else if (d.kind === 'direct') {
+      html = '<strong>Indice direct —</strong> aucune technique simple ne s\'applique ici. ' +
+             'Place le <strong>' + d.digit + '</strong> en <strong>' + cellLabel(d.cell) + '</strong>.';
+      showPlace = true;
+    } else if (hint.phase === 1) {            // 'place', phase 1 : nom seul
+      html = '<strong>Technique —</strong> ' + hintTitle(d) +
+             '.<br><span class="hint-sub">Touche « Voir la solution » pour le coup à jouer.</span>';
+      showMore = true;
+    } else {                                  // 'place', phase 2 : solution concrète
+      html = '<strong>' + hintTitle(d) + ' —</strong> ' + (d.explain || '') +
+             '<br><span class="hint-sub">Place le <strong>' + d.digit + '</strong> en <strong>' +
+             cellLabel(d.cell) + '</strong>.</span>';
+      showPlace = true;
+    }
+
+    els.hintBody.innerHTML = html;
+    els.hintMore.hidden = !showMore;
+    els.hintPlace.hidden = !showPlace;
+    els.hintPanel.hidden = false;
   }
 
   // ---- Fin de partie --------------------------------------------------------
@@ -412,7 +611,8 @@
     els.toolErase.classList.toggle('active', state.eraser);
     els.toolPencil.classList.toggle('active', state.pencil);
     els.pencilBadge.textContent = state.pencil ? 'ON' : 'OFF';
-    els.toolBulb.classList.toggle('active', state.autoNotes);
+    els.toolAutonotes.classList.toggle('active', state.autoNotes);
+    updateUndoBtn();
 
     // entête
     els.errors.textContent = state.errors + '/' + MAX_ERRORS;
@@ -477,11 +677,17 @@
       diffMenu: document.getElementById('difficulty-menu'),
       pauseBtn: document.getElementById('pause-btn'),
       newGameBtn: document.getElementById('new-game'),
-      toolRestart: document.getElementById('tool-restart'),
+      toolUndo: document.getElementById('tool-undo'),
       toolErase: document.getElementById('tool-erase'),
       toolPencil: document.getElementById('tool-pencil'),
+      toolAutonotes: document.getElementById('tool-autonotes'),
       toolBulb: document.getElementById('tool-bulb'),
       pencilBadge: document.getElementById('pencil-badge'),
+      hintPanel: document.getElementById('hint-panel'),
+      hintBody: document.getElementById('hint-body'),
+      hintMore: document.getElementById('hint-more'),
+      hintPlace: document.getElementById('hint-place'),
+      hintClose: document.getElementById('hint-close'),
       numpad: document.getElementById('numpad'),
       modal: document.getElementById('modal'),
       modalText: document.getElementById('modal-text'),
@@ -509,13 +715,16 @@
     }
 
     // Outils
-    els.toolRestart.addEventListener('click', () => {
-      if (!inProgress()) { restart(); return; }
-      askConfirm('Recommencer la partie ? Toutes tes saisies seront effacées.', restart);
-    });
+    els.toolUndo.addEventListener('click', undo);
     els.toolErase.addEventListener('click', toggleEraser);
     els.toolPencil.addEventListener('click', togglePencil);
-    els.toolBulb.addEventListener('click', toggleAutoNotes);
+    els.toolAutonotes.addEventListener('click', toggleAutoNotes);
+    els.toolBulb.addEventListener('click', showHint);
+
+    // Panneau d'astuce
+    els.hintMore.addEventListener('click', revealHint);
+    els.hintPlace.addEventListener('click', placeHint);
+    els.hintClose.addEventListener('click', dismissHint);
 
     // Pause
     els.pauseBtn.addEventListener('click', togglePause);
