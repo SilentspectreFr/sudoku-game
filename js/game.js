@@ -129,6 +129,7 @@
     pushHistory();
     state.values[i] = 0;
     state.notes[i].clear();
+    if (state.autoNotes) recomputeAutoNotes();   // restaure les candidats libérés par la gomme
     render();
     save();
   }
@@ -184,6 +185,7 @@
     if (state.values[i] === d) {               // re-poser la même valeur = effacer
       pushHistory();
       state.values[i] = 0;
+      if (state.autoNotes) recomputeAutoNotes();
       render();
       save();
       return;
@@ -195,8 +197,10 @@
     state.notes[i].clear();
 
     if (d === state.solution[i]) {
-      // nettoyage des annotations de ce chiffre chez les pairs
-      forEachPeer(i, (p) => state.notes[p].delete(d));
+      // mode Auto : recalcul complet (notes = vrais candidats) ; mode manuel : on
+      // retire seulement ce chiffre des annotations des pairs.
+      if (state.autoNotes) recomputeAutoNotes();
+      else forEachPeer(i, (p) => state.notes[p].delete(d));
     } else if (!wasWrong) {
       // nouvelle erreur (on ne recompte pas une case déjà fausse)
       state.errors++;
@@ -272,6 +276,22 @@
     render();
   }
 
+  // Recalcule TOUTES les annotations = vrais candidats du plateau. En mode Auto, on
+  // rappelle ceci après chaque changement de valeur : la maintenance purement
+  // soustractive (retirer un chiffre des pairs) ne sait pas RESTAURER un candidat
+  // après une gomme/correction, et les notes finissent désynchronisées des candidats
+  // réels — ce que l'astuce, elle, recalcule toujours (d'où l'impression de bug).
+  function recomputeAutoNotes() {
+    const g = buildWorkingGrid();
+    for (let i = 0; i < 81; i++) {
+      if (valueAt(i)) { state.notes[i].clear(); continue; }
+      const cm = E.candMask(g, i);
+      const set = new Set();
+      for (let d = 1; d <= 9; d++) if (cm & (1 << (d - 1))) set.add(d);
+      state.notes[i] = set;
+    }
+  }
+
   // Remplit toutes les annotations possibles, ou les efface si déjà actif.
   function toggleAutoNotes() {
     pushHistory();
@@ -279,13 +299,7 @@
       for (let i = 0; i < 81; i++) state.notes[i].clear();
       state.autoNotes = false;
     } else {
-      for (let i = 0; i < 81; i++) {
-        if (valueAt(i)) { state.notes[i].clear(); continue; }
-        const cm = E.candMask(buildWorkingGrid(), i);
-        const set = new Set();
-        for (let d = 1; d <= 9; d++) if (cm & (1 << (d - 1))) set.add(d);
-        state.notes[i] = set;
-      }
+      recomputeAutoNotes();
       state.autoNotes = true;
     }
     render();
