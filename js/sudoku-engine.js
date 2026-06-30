@@ -220,6 +220,7 @@
     generateFull,
     countSolutions,
     generatePuzzle,
+    digPuzzle,
     solvableBySingles,
     candMask,
     DIFFICULTIES,

@@ -20,6 +20,7 @@
   const BIT_TO_DIGIT = { 1: 1, 2: 2, 4: 3, 8: 4, 16: 5, 32: 6, 64: 7, 128: 8, 256: 9 };
 
   function popcount(x) { let c = 0; while (x) { x &= x - 1; c++; } return c; }
+  const SUBSET_NAME = { 2: 'Pair', 3: 'Triple', 4: 'Quad' };
   function digitsOf(mask) { const a = []; for (let d = 1; d <= 9; d++) if (mask & (1 << (d - 1))) a.push(d); return a; }
   function bit(d) { return 1 << (d - 1); }
 
@@ -184,7 +185,7 @@
         if (!elims.length) continue;
         const ds = digitsOf(union);
         const inst = {
-          technique: size === 2 ? 'nakedPair' : 'nakedTriple',
+          technique: 'naked' + SUBSET_NAME[size],
           eliminations: elims,
           highlight: { unitCells: u.cells.slice(), cells: grp.slice(), baseDigits: ds, elim: elims.slice() },
           explain: 'Dans ' + unitName(u) + ', les cases ' + cellsName(grp) + ' ne contiennent que les '
@@ -233,7 +234,7 @@
         }
         if (!elims.length) continue;
         const inst = {
-          technique: size === 2 ? 'hiddenPair' : 'hiddenTriple',
+          technique: 'hidden' + SUBSET_NAME[size],
           eliminations: elims,
           highlight: { unitCells: u.cells.slice(), cells: [...cellSet], baseDigits: grp.slice(), elim: elims.slice() },
           explain: 'Dans ' + unitName(u) + ', les chiffres {' + grp.join(', ') + '} ne peuvent se placer que '
@@ -276,6 +277,41 @@
             + unitName(line) + ' (cases ' + cellsName(spots) + '). Il sera donc forcément dans le bloc, '
             + 'sur cette ' + (line.type === 'row' ? 'ligne' : 'colonne') + ' : on retire le ' + d
             + ' du reste de ' + unitName(line) + ', hors du bloc.',
+        };
+        if (out) out.push(inst); else return inst;
+      }
+    }
+    return null;
+  }
+
+  // 10b. Candidats verrouillés "claiming" (réduction ligne→bloc).
+  //   Complément du pointant : dans une ligne (ou colonne), un chiffre n'a de
+  //   candidats que dans un seul bloc -> on l'élimine du reste de ce bloc.
+  function detectClaiming(g, cands, out) {
+    const lines = ROWS.concat(COLS);
+    for (const line of lines) {
+      const present = new Set(line.cells.map((i) => g[i]).filter(Boolean));
+      for (let d = 1; d <= 9; d++) {
+        if (present.has(d)) continue;
+        const spots = line.cells.filter((i) => !g[i] && (cands[i] & bit(d)));
+        if (spots.length < 2 || spots.length > 3) continue;
+        const boxes = new Set(spots.map(boxOf));
+        if (boxes.size !== 1) continue;
+        const box = BOXES[[...boxes][0]];
+        const elims = [];
+        for (const i of box.cells) {
+          if (line.cells.includes(i) || g[i]) continue;
+          if (cands[i] & bit(d)) elims.push({ cell: i, digit: d });
+        }
+        if (!elims.length) continue;
+        const inst = {
+          technique: 'claiming',
+          eliminations: elims,
+          highlight: { unitCells: line.cells.slice(), lineCells: box.cells.slice(), cells: spots.slice(), baseDigits: [d], elim: elims.slice() },
+          explain: 'Dans ' + unitName(line) + ', le chiffre ' + d + ' n’a de candidats que dans '
+            + unitName(box) + ' (cases ' + cellsName(spots) + '). Il sera donc forcément dans ce bloc, '
+            + 'sur cette ' + (line.type === 'row' ? 'ligne' : 'colonne') + ' : on retire le ' + d
+            + ' du reste de ' + unitName(box) + '.',
         };
         if (out) out.push(inst); else return inst;
       }
@@ -391,6 +427,94 @@
     return null;
   }
 
+  // 15. XYZ-Wing : pivot trivaleur {a,b,c} relié à deux pinces bivalues {a,c} et {b,c}.
+  //   Le chiffre c (commun au pivot et aux deux pinces) s'élimine de toute case
+  //   voyant À LA FOIS le pivot et les deux pinces.
+  function detectXYZWing(g, cands, out) {
+    const empties = [];
+    for (let i = 0; i < 81; i++) if (!g[i]) empties.push(i);
+    const pivots = empties.filter((i) => popcount(cands[i]) === 3);
+    const bivs = empties.filter((i) => popcount(cands[i]) === 2);
+    for (const P of pivots) {
+      const pd = cands[P];
+      const pinces = bivs.filter((q) => PEERS[P].includes(q) && (cands[q] & ~pd) === 0);
+      for (let i = 0; i < pinces.length; i++) {
+        for (let j = i + 1; j < pinces.length; j++) {
+          const A = pinces[i], B = pinces[j];
+          if ((cands[A] | cands[B]) !== pd) continue;   // l'union des pinces = les 3 chiffres du pivot
+          const commonMask = cands[A] & cands[B];
+          if (popcount(commonMask) !== 1) continue;     // les pinces partagent exactement un chiffre
+          const c = digitsOf(commonMask)[0];
+          const bc = bit(c);
+          const elims = [];
+          for (const cell of PEERS[P]) {
+            if (cell === A || cell === B || g[cell] || !(cands[cell] & bc)) continue;
+            if (PEERS[A].includes(cell) && PEERS[B].includes(cell)) elims.push({ cell, digit: c });
+          }
+          if (!elims.length) continue;
+          const inst = {
+            technique: 'xyzWing',
+            eliminations: elims,
+            highlight: { cells: [P, A, B], baseDigits: digitsOf(pd), elim: elims.slice() },
+            explain: 'XYZ-Wing : le pivot ' + cellName(P) + ' {' + digitsOf(pd).join(', ') + '} et ses deux pinces '
+              + cellName(A) + ' {' + digitsOf(cands[A]).join(', ') + '} et ' + cellName(B) + ' {' + digitsOf(cands[B]).join(', ')
+              + '} contiennent toutes le ' + c + '. Toute case voyant ces trois cases ne peut pas valoir ' + c
+              + ' : on retire le ' + c + ' de ' + cellsName(elims.map((e) => e.cell)) + '.',
+          };
+          if (out) out.push(inst); else return inst;
+        }
+      }
+    }
+    return null;
+  }
+
+  // 16. W-Wing : deux cases bivalues IDENTIQUES {a,b}, non voisines, reliées par un
+  //   lien fort sur b (une unité où b n'a que 2 cases, voisines respectives des deux).
+  //   Alors a s'élimine de toute case voyant les deux cases bivalues.
+  function detectWWing(g, cands, out) {
+    const bivs = [];
+    for (let i = 0; i < 81; i++) if (!g[i] && popcount(cands[i]) === 2) bivs.push(i);
+    for (let i = 0; i < bivs.length; i++) {
+      for (let j = i + 1; j < bivs.length; j++) {
+        const X = bivs[i], Y = bivs[j];
+        if (cands[X] !== cands[Y]) continue;
+        if (PEERS[X].includes(Y)) continue;
+        const [d1, d2] = digitsOf(cands[X]);
+        for (const link of [d1, d2]) {
+          const other = link === d1 ? d2 : d1;
+          const bl = bit(link);
+          let linked = false;
+          for (const u of UNIT_DEFS) {
+            const spots = u.cells.filter((k) => !g[k] && (cands[k] & bl));
+            if (spots.length !== 2) continue;
+            const [s1, s2] = spots;
+            if (s1 === X || s1 === Y || s2 === X || s2 === Y) continue;
+            if ((PEERS[X].includes(s1) && PEERS[Y].includes(s2)) || (PEERS[X].includes(s2) && PEERS[Y].includes(s1))) { linked = true; break; }
+          }
+          if (!linked) continue;
+          const bo = bit(other);
+          const elims = [];
+          for (let cell = 0; cell < 81; cell++) {
+            if (cell === X || cell === Y || g[cell] || !(cands[cell] & bo)) continue;
+            if (PEERS[X].includes(cell) && PEERS[Y].includes(cell)) elims.push({ cell, digit: other });
+          }
+          if (!elims.length) continue;
+          const inst = {
+            technique: 'wWing',
+            eliminations: elims,
+            highlight: { cells: [X, Y], baseDigits: [d1, d2], elim: elims.slice() },
+            explain: 'W-Wing : les cases ' + cellName(X) + ' et ' + cellName(Y) + ' portent la même paire {'
+              + d1 + ', ' + d2 + '}, reliées par un lien fort sur le ' + link + '. L’une des deux vaudra donc ' + other
+              + ' : toute case voyant les deux ne peut pas valoir ' + other + '. On retire le ' + other + ' de '
+              + cellsName(elims.map((e) => e.cell)) + '.',
+          };
+          if (out) out.push(inst); else return inst;
+        }
+      }
+    }
+    return null;
+  }
+
   // =========================================================================
   //  SOLVEUR PAR PALIERS (pour amener une position au "prochain pas = T")
   // =========================================================================
@@ -404,10 +528,29 @@
     { rank: 7, fn: (g, c) => detectHiddenSubset(g, c, 2) },
     { rank: 8, fn: (g, c) => detectHiddenSubset(g, c, 3) },
     { rank: 9, fn: (g, c) => detectPointing(g, c, 0) },
-    { rank: 11, fn: (g, c) => detectFish(g, c, 2) },   // X-Wing
-    { rank: 12, fn: detectYWing },                     // Y-Wing
-    { rank: 13, fn: (g, c) => detectFish(g, c, 3) },   // Swordfish
+    { rank: 10, fn: detectClaiming },                   // box/line reduction
+    { rank: 11, fn: (g, c) => detectNakedSubset(g, c, 4) },   // Quad nu
+    { rank: 13, fn: (g, c) => detectFish(g, c, 2) },   // X-Wing
+    { rank: 14, fn: detectYWing },                     // Y-Wing
+    { rank: 15, fn: detectXYZWing },                   // XYZ-Wing
+    { rank: 16, fn: detectWWing },                     // W-Wing
+    { rank: 17, fn: (g, c) => detectFish(g, c, 3) },   // Swordfish
   ];
+
+  // Rang d'une technique par son id (SOLVERS étant indexé par fonction). Sert à la
+  // gradation : on suit le rang max réellement requis pour résoudre une grille.
+  const TECH_RANK = {
+    fullHouse: 1, nakedSingle: 3,
+    nakedPair: 5, nakedTriple: 6, hiddenPair: 7, hiddenTriple: 8,
+    pointingPair: 9, pointingTriple: 9, claiming: 10,
+    nakedQuad: 11,
+    xWing: 13, yWing: 14, xyzWing: 15, wWing: 16, swordfish: 17,
+  };
+  // hiddenSingle dépend du scope (box=2, all=4) — résolu à part dans rankOf.
+  function rankOf(inst) {
+    if (inst.technique === 'hiddenSingle') return inst.scope === 'box' ? 2 : 4;
+    return TECH_RANK[inst.technique] || 0;
+  }
 
   function solveBelow(g, cands, rT) {
     for (const s of SOLVERS) {
@@ -421,6 +564,96 @@
   function solveFull(g, cands) {
     for (const s of SOLVERS) { const inst = s.fn(g, cands); if (inst) return inst; }
     return null;
+  }
+
+  // =========================================================================
+  //  GRADATION & GÉNÉRATION GRADUÉE (bornée à l'arsenal)
+  // =========================================================================
+  // Résout une grille avec TOUT l'arsenal et renvoie {solved, maxRank, techniquesUsed}.
+  // C'est ce qui garantit qu'une grille livrée est résoluble sans deviner, et qui
+  // mesure le rang de la technique la plus dure réellement requise.
+  function gradePuzzle(puzzle) {
+    const g = puzzle.slice();
+    const cands = computeCands(g);
+    let maxRank = 0; const used = {};
+    for (let guard = 0; guard < 400; guard++) {
+      const inst = solveFull(g, cands);
+      if (!inst) break;
+      const r = rankOf(inst);
+      if (r > maxRank) maxRank = r;
+      used[inst.technique] = (used[inst.technique] || 0) + 1;
+      applyInstance(g, cands, inst);
+    }
+    return { solved: isSolved(g), maxRank, techniquesUsed: used };
+  }
+
+  // Bandes de difficulté : on conserve les minGivens du moteur (ressenti inchangé) et on
+  // AJOUTE une borne par rang de technique. floor = il faut au moins une technique de ce
+  // rang ; ceil = rien au-dessus (et la grille DOIT être résoluble par l'arsenal).
+  //   facile/moyen : singles only (ceil 4). difficile : au-delà des singles. expert :
+  //   préfère une technique avancée (floor 13), plancher relâchable si le budget l'exige.
+  const DIFF_BANDS = {
+    facile:    { minGivens: 42, floor: 1, ceil: 4,  preferFloor: 1,  maxAttempts: 40 },
+    moyen:     { minGivens: 35, floor: 1, ceil: 4,  preferFloor: 1,  maxAttempts: 40 },
+    difficile: { minGivens: 30, floor: 5, ceil: 17, preferFloor: 5,  maxAttempts: 120 },
+    expert:    { minGivens: 26, floor: 5, ceil: 17, preferFloor: 13, maxAttempts: 200 },
+  };
+
+  // Génère une grille GARANTIE résoluble par l'arsenal et dans la bande du niveau.
+  // Pilote directement les primitives du moteur (generateFull/digPuzzle) puis grade.
+  function generatePuzzleGraded(difficulty) {
+    const band = DIFF_BANDS[difficulty] || DIFF_BANDS.facile;
+    let best = null;
+    for (let attempt = 0; attempt < band.maxAttempts; attempt++) {
+      const solution = E.generateFull();
+      const { puzzle, givens } = E.digPuzzle(solution, band.minGivens);
+      const grade = gradePuzzle(puzzle);
+      if (!grade.solved) continue;                 // jamais d'impasse : rejet dur
+      if (grade.maxRank > band.ceil) continue;     // trop dur pour la bande : rejet dur
+      const cand = { puzzle, solution, givens, difficulty, maxRank: grade.maxRank, techniquesUsed: grade.techniquesUsed };
+      if (!best || grade.maxRank > best.maxRank) best = cand; // garde la plus relevée vue
+      if (grade.maxRank >= band.preferFloor) return cand;     // plancher « idéal » atteint
+    }
+    if (best && best.maxRank >= band.floor) return best;      // plancher minimal accepté
+    if (best) return best;                                     // résoluble, sous le plancher
+    return fallbackSolvedPuzzle(difficulty);                   // garde-fou ultime
+  }
+
+  // Repli ultime : remonte le nombre d'indices jusqu'à une grille résoluble par l'arsenal.
+  // Termine toujours (une grille résoluble par singles l'est par l'arsenal).
+  function fallbackSolvedPuzzle(difficulty) {
+    for (let givensTarget = (DIFF_BANDS[difficulty] || DIFF_BANDS.facile).minGivens; givensTarget <= 60; givensTarget += 4) {
+      for (let attempt = 0; attempt < 30; attempt++) {
+        const solution = E.generateFull();
+        const { puzzle, givens } = E.digPuzzle(solution, givensTarget);
+        const grade = gradePuzzle(puzzle);
+        if (grade.solved) return { puzzle, solution, givens, difficulty, maxRank: grade.maxRank, techniquesUsed: grade.techniquesUsed };
+      }
+    }
+    // ne devrait jamais arriver : grille pleine = résoluble trivialement
+    const solution = E.generateFull();
+    return { puzzle: solution.slice(), solution, givens: 81, difficulty, maxRank: 0, techniquesUsed: {} };
+  }
+
+  // Garde-fou anti-régression, sans DOM : par niveau, génère perLevel grilles et vérifie
+  // qu'elles sont TOUTES résolubles par l'arsenal et dans le plafond de la bande.
+  function selfTestGraded(perLevel) {
+    perLevel = perLevel || 30;
+    const report = {};
+    for (const diff of Object.keys(DIFF_BANDS)) {
+      const band = DIFF_BANDS[diff];
+      let solvedAll = true, withinCeil = true, floorHits = 0, sumGivens = 0;
+      for (let i = 0; i < perLevel; i++) {
+        const p = generatePuzzleGraded(diff);
+        const grade = gradePuzzle(p.puzzle);
+        if (!grade.solved) solvedAll = false;
+        if (grade.maxRank > band.ceil) withinCeil = false;
+        if (grade.maxRank >= band.preferFloor) floorHits++;
+        sumGivens += p.givens;
+      }
+      report[diff] = { solvedAll, withinCeil, floorRate: Math.round(100 * floorHits / perLevel), avgGivens: Math.round(sumGivens / perLevel) };
+    }
+    return report;
   }
 
   function validInstance(inst, solution) {
@@ -500,19 +733,43 @@
       how: 'Un chiffre confiné à trois cases alignées d’un bloc s’élimine du reste de leur ligne ou colonne.',
     },
     {
-      id: 'xWing', title: 'X-Wing', level: 'avance', rank: 11,
+      id: 'claiming', title: 'Réduction ligne→bloc', level: 'technique', rank: 10,
+      detect: (g, c, out) => detectClaiming(g, c, out), gen: ['difficile', 'expert'],
+      summary: 'Le complément du pointant : si dans une ligne (ou colonne) un chiffre n’a de candidats que dans un seul bloc, ce chiffre quitte le reste de ce bloc.',
+      how: 'Un chiffre confiné, dans une ligne/colonne, aux cases d’un seul bloc : on le « revendique » pour ce bloc et on l’élimine des autres cases du bloc.',
+    },
+    {
+      id: 'nakedQuad', title: 'Quadruplets nus', level: 'technique', rank: 11,
+      detect: (g, c, out) => detectNakedSubset(g, c, 4, out), gen: ['expert'],
+      summary: 'Quatre cases d’une même unité dont les candidats tiennent en quatre chiffres se réservent ces quatre chiffres : on les retire des autres cases de l’unité.',
+      how: 'Quatre cases d’une unité dont l’union des candidats fait exactement quatre chiffres. On retire ces chiffres des autres cases de l’unité.',
+    },
+    {
+      id: 'xWing', title: 'X-Wing', level: 'avance', rank: 13,
       detect: (g, c, out) => detectFish(g, c, 2, out), gen: ['expert'],
       summary: 'Un chiffre candidat dans seulement deux cases sur deux lignes, alignées sur les deux mêmes colonnes, forme un rectangle (X-Wing) : on l’élimine de ces deux colonnes ailleurs (et symétriquement lignes ↔ colonnes).',
       how: 'Repère un chiffre confiné à 2 cases sur deux lignes, dans les deux mêmes colonnes. Élimine-le de ces colonnes dans les autres lignes (ou l’inverse).',
     },
     {
-      id: 'yWing', title: 'Y-Wing', level: 'avance', rank: 12,
+      id: 'yWing', title: 'Y-Wing', level: 'avance', rank: 14,
       detect: detectYWing, gen: ['expert'],
       summary: 'Trois cases à deux candidats formant une chaîne : un pivot {X, Y} relié à deux pinces {X, Z} et {Y, Z}. Le chiffre Z s’élimine de toute case qui voit les deux pinces.',
       how: 'Trouve une case pivot {X, Y} reliée à deux pinces {X, Z} et {Y, Z}. Le Z disparaît des cases voyant les deux pinces.',
     },
     {
-      id: 'swordfish', title: 'Swordfish', level: 'avance', rank: 13,
+      id: 'xyzWing', title: 'XYZ-Wing', level: 'avance', rank: 15,
+      detect: (g, c, out) => detectXYZWing(g, c, out), gen: ['expert'],
+      summary: 'Variante du Y-Wing où le pivot porte trois candidats {X, Y, Z} et ses deux pinces {X, Z} et {Y, Z}. Le Z s’élimine des cases voyant le pivot ET les deux pinces.',
+      how: 'Un pivot à trois chiffres relié à deux pinces partageant un Z commun : le Z disparaît des cases voyant les trois.',
+    },
+    {
+      id: 'wWing', title: 'W-Wing', level: 'avance', rank: 16,
+      detect: (g, c, out) => detectWWing(g, c, out), gen: ['expert'],
+      summary: 'Deux cases à la même paire {a, b}, reliées par un lien fort sur b : l’une des deux vaut forcément a. Le a s’élimine de toute case voyant ces deux cases.',
+      how: 'Deux bivaleurs identiques {a, b} reliés par une unité où b n’a que deux places : on retire a des cases voyant les deux.',
+    },
+    {
+      id: 'swordfish', title: 'Swordfish', level: 'avance', rank: 17,
       detect: (g, c, out) => detectFish(g, c, 3, out), gen: ['expert'],
       summary: 'La généralisation du X-Wing à trois lignes et trois colonnes : un chiffre confiné, sur trois lignes, à trois colonnes communes s’élimine de ces colonnes dans les autres lignes (et inversement).',
       how: 'Trois lignes où le chiffre tient dans (au plus) trois colonnes communes. Élimine-le de ces trois colonnes dans les autres lignes.',
@@ -592,8 +849,9 @@
     LESSONS, LESSON_BY_ID,
     computeCands, applyInstance, solveBelow, generateExercise, detectAllInstances,
     detectFullHouse, detectHiddenSingle, detectNakedSingle,
-    detectNakedSubset, detectHiddenSubset, detectPointing,
-    detectFish, detectYWing, solveFull,
+    detectNakedSubset, detectHiddenSubset, detectPointing, detectClaiming,
+    detectFish, detectYWing, detectXYZWing, detectWWing, solveFull,
+    gradePuzzle, generatePuzzleGraded, selfTestGraded, DIFF_BANDS, rankOf,
     cellName, unitName, digitsOf,
     UNIT_DEFS, PEERS,
   };

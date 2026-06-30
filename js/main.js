@@ -16,6 +16,15 @@
         console.log('%c[Sudoku] self-test moteur ' + (ok ? 'OK ✓' : 'ÉCHEC ✗'),
           'color:' + (ok ? '#16a34a' : '#dc2626') + ';font-weight:bold');
         console.table(rep);
+
+        // Garde-fou génération graduée : toute grille livrée est résoluble par l'arsenal.
+        if (window.SudokuTech && window.SudokuTech.selfTestGraded) {
+          const grep = window.SudokuTech.selfTestGraded(12);
+          const gok = Object.values(grep).every((r) => r.solvedAll && r.withinCeil);
+          console.log('%c[Sudoku] self-test génération graduée ' + (gok ? 'OK ✓' : 'ÉCHEC ✗'),
+            'color:' + (gok ? '#16a34a' : '#dc2626') + ';font-weight:bold');
+          console.table(grep);
+        }
       } catch (e) {
         console.warn('[Sudoku] self-test indisponible', e);
       }

@@ -59,7 +59,11 @@
     showLoading(true);
     // setTimeout(0) pour laisser le navigateur peindre l'overlay avant de générer.
     setTimeout(() => {
-      const { puzzle, solution } = E.generatePuzzle(difficulty);
+      // Génération bornée à l'arsenal de techniques (jamais d'impasse « Indice direct »).
+      // Repli sur le moteur seul si techniques.js n'est pas chargé (robustesse file://).
+      const { puzzle, solution } = (global.SudokuTech && global.SudokuTech.generatePuzzleGraded)
+        ? global.SudokuTech.generatePuzzleGraded(difficulty)
+        : E.generatePuzzle(difficulty);
       state.solution = solution;
       state.givens = puzzle.slice();
       state.values = new Array(81).fill(0);
@@ -316,24 +320,30 @@
     return (lesson && lesson.title) || 'Technique logique';
   }
 
-  // Déroule les techniques les plus simples jusqu'au PROCHAIN placement jouable.
-  // Les éliminations pures (utiles seulement avec les notes) sont appliquées en
-  // silence : on garantit toujours un coup à poser. Renvoie null si bloqué.
-  function nextPlacementHint() {
+  // Renvoie le PROCHAIN pas logique réel sur la grille telle que le joueur la voit,
+  // tel quel — placement OU élimination. On NE déroule PAS d'éliminations en silence :
+  // le faire produirait un placement dont l'explication décrit l'état des candidats
+  // APRÈS éliminations (donc faux au regard du plateau). Renvoie null si bloqué.
+  function nextHint() {
     const T = global.SudokuTech;
     if (!T) return null;
     const g = buildWorkingGrid();
     const cands = T.computeCands(g);
-    for (let guard = 0; guard < 200; guard++) {
-      const inst = T.solveFull(g, cands);
-      if (!inst) return null;
-      if (inst.placements && inst.placements.length) {
-        const p = inst.placements[0];
-        if (p.digit !== state.solution[p.cell]) return null;   // garde-fou anti-bug détecteur
-        return { kind: 'place', cell: p.cell, digit: p.digit,
-                 technique: inst.technique, scope: inst.scope, explain: inst.explain };
-      }
-      T.applyInstance(g, cands, inst);                          // élimination : on applique et on continue
+    const inst = T.solveFull(g, cands);
+    if (!inst) return null;
+    if (inst.placements && inst.placements.length) {
+      const p = inst.placements[0];
+      if (p.digit !== state.solution[p.cell]) return null;     // garde-fou anti-bug détecteur
+      return { kind: 'place', cell: p.cell, digit: p.digit,
+               technique: inst.technique, scope: inst.scope, explain: inst.explain };
+    }
+    if (inst.eliminations && inst.eliminations.length) {
+      // garde-fou : une élimination ne doit jamais viser le vrai chiffre de la case.
+      for (const e of inst.eliminations) if (state.solution[e.cell] === e.digit) return null;
+      const cells = (inst.highlight && inst.highlight.cells) ? inst.highlight.cells.slice() : [];
+      return { kind: 'eliminate', technique: inst.technique, scope: inst.scope,
+               explain: inst.explain, eliminations: inst.eliminations.slice(),
+               cells, cell: cells.length ? cells[0] : inst.eliminations[0].cell };
     }
     return null;
   }
@@ -368,8 +378,8 @@
       return;
     }
 
-    // 2) Prochain coup jouable + technique qui le débloque.
-    const data = nextPlacementHint();
+    // 2) Prochain pas logique réel (placement ou élimination) sur le plateau actuel.
+    const data = nextHint();
     if (data) { hint = { data, phase: 1 }; renderHintPanel(); return; }
 
     // 3) Repli : indice direct depuis la solution.
@@ -388,10 +398,10 @@
 
   // Passe de la phase 1 (nom) à la phase 2 (solution concrète + surlignage).
   function revealHint() {
-    if (!hint.data || hint.data.kind !== 'place') return;
+    if (!hint.data || (hint.data.kind !== 'place' && hint.data.kind !== 'eliminate')) return;
     hint.phase = 2;
     state.eraser = false; state.lockedNumber = null;
-    selectCell(hint.data.cell);
+    if (hint.data.cell != null) selectCell(hint.data.cell);
     renderHintPanel();
   }
 
@@ -425,15 +435,20 @@
       html = '<strong>Indice direct —</strong> aucune technique simple ne s\'applique ici. ' +
              'Place le <strong>' + d.digit + '</strong> en <strong>' + cellLabel(d.cell) + '</strong>.';
       showPlace = true;
-    } else if (hint.phase === 1) {            // 'place', phase 1 : nom seul
+    } else if (hint.phase === 1) {            // 'place'/'eliminate', phase 1 : nom seul
       html = '<strong>Technique —</strong> ' + hintTitle(d) +
-             '.<br><span class="hint-sub">Touche « Voir la solution » pour le coup à jouer.</span>';
+             '.<br><span class="hint-sub">Touche « Voir la solution » pour le détail.</span>';
       showMore = true;
-    } else {                                  // 'place', phase 2 : solution concrète
+    } else if (d.kind === 'place') {          // phase 2 : placement concret
       html = '<strong>' + hintTitle(d) + ' —</strong> ' + (d.explain || '') +
              '<br><span class="hint-sub">Place le <strong>' + d.digit + '</strong> en <strong>' +
              cellLabel(d.cell) + '</strong>.</span>';
       showPlace = true;
+    } else {                                  // phase 2 : élimination (rien à poser encore)
+      const what = d.eliminations.map((e) => 'le ' + e.digit + ' en ' + cellLabel(e.cell)).join(', ');
+      html = '<strong>' + hintTitle(d) + ' —</strong> ' + (d.explain || '') +
+             '<br><span class="hint-sub">Pas de chiffre à poser ici : retire ' + what +
+             ' de tes notes, puis redemande une astuce pour la suite.</span>';
     }
 
     els.hintBody.innerHTML = html;

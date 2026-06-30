@@ -37,11 +37,20 @@ Pas de modules ES → on peut ouvrir `index.html` directement. Sinon :
 - `js/trainer.js` — UI du mode entraînement (liste, plateau, indice/solution/explication).
 
 ## Mode entraînement — techniques
-14 techniques couvertes : 11 de base (jusqu'aux pointants) + X-Wing / Y-Wing / Swordfish.
-Pour en ajouter une : écrire le détecteur, l'ajouter à `SOLVERS` (avec son rang de difficulté) et
-une entrée `LESSONS` ; puis **valider en Node** (générer N exercices, vérifier chaque instance
-contre la solution). La génération déroule toute la résolution et capture la position où la
-technique visée est le prochain pas logique (gère les techniques rares comme le Swordfish).
+18 techniques couvertes : singles + paires/triplets (nus & cachés) + quadruplets nus + pointants +
+réduction ligne→bloc (claiming) + X-Wing / Y-Wing / XYZ-Wing / W-Wing / Swordfish.
+Pour en ajouter une : écrire le détecteur, l'ajouter à `SOLVERS` (avec son rang de difficulté),
+ajouter sa paire `technique→rang` à `TECH_RANK`, et une entrée `LESSONS` ; puis **valider en Node**
+(générer N exercices, vérifier chaque instance contre la solution). La génération déroule toute la
+résolution et capture la position où la technique visée est le prochain pas logique.
+
+## Difficulté bornée à l'arsenal (IMPORTANT)
+La partie classique génère via `SudokuTech.generatePuzzleGraded(diff)` (pas `E.generatePuzzle`) :
+toute grille livrée est **garantie entièrement résoluble par l'arsenal** (jamais d'impasse « Indice
+direct ») et tombe dans la bande de rang de son niveau (`DIFF_BANDS`). `gradePuzzle()` résout avec
+tout l'arsenal et renvoie `{solved, maxRank}`. Les `minGivens` restent ceux du moteur (ressenti
+inchangé). Ajouter une technique relève le rendement de génération. Garde-fous : `test/run.js`
+(bloc « génération graduée ») + `SudokuTech.selfTestGraded()` en console.
 
 ## Conventions
 - Pas d'ES modules (scripts `<script>` classiques) pour garder l'ouverture `file://` et un

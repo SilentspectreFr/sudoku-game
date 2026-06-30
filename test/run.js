@@ -40,6 +40,24 @@ for (const diff of Object.keys(E.DIFFICULTIES)) {
             : fail(`${diff} : ${bad}/${N_GRIDS} grilles non conformes`);
 }
 
+// 2b) Génération graduée — chaque grille livrée est ENTIÈREMENT résoluble par l'arsenal
+//     (zéro impasse « Indice direct ») et reste sous le plafond de rang de sa bande.
+console.log('Génération graduée — résolubilité garantie :');
+const N_GRADED = 25;
+for (const diff of Object.keys(T.DIFF_BANDS)) {
+  const ceil = T.DIFF_BANDS[diff].ceil;
+  let unsolved = 0, overCeil = 0;
+  for (let i = 0; i < N_GRADED; i++) {
+    const p = T.generatePuzzleGraded(diff);
+    const grade = T.gradePuzzle(p.puzzle);
+    if (!grade.solved) unsolved++;
+    if (grade.maxRank > ceil) overCeil++;
+  }
+  if (unsolved > 0) fail(`${diff} : ${unsolved}/${N_GRADED} grilles NON résolubles par l'arsenal`);
+  else if (overCeil > 0) fail(`${diff} : ${overCeil}/${N_GRADED} grilles au-dessus du plafond (rang ${ceil})`);
+  else ok(`${diff} : ${N_GRADED} grilles 100% résolubles par l'arsenal (≤ rang ${ceil})`);
+}
+
 // 3) Techniques — chaque exercice généré est valide contre la solution.
 console.log('Techniques — validité des exercices :');
 const validInstance = (inst, solution) => {
