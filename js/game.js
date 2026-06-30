@@ -352,7 +352,7 @@
       if (inst.placements && inst.placements.length) {
         const p = inst.placements[0];
         if (p.digit !== state.solution[p.cell]) return null;   // garde-fou anti-bug détecteur
-        return { kind: 'place', cell: p.cell, digit: p.digit,
+        return { kind: 'place', cell: p.cell, digit: p.digit, highlight: inst.highlight,
                  technique: inst.technique, scope: inst.scope, explain: inst.explain };
       }
       // garde-fou : une élimination ne doit jamais viser le vrai chiffre de la case.
@@ -362,7 +362,7 @@
         continue;
       }
       const cells = (inst.highlight && inst.highlight.cells) ? inst.highlight.cells.slice() : [];
-      return { kind: 'eliminate', technique: inst.technique, scope: inst.scope,
+      return { kind: 'eliminate', technique: inst.technique, scope: inst.scope, highlight: inst.highlight,
                explain: inst.explain, eliminations: inst.eliminations.slice(),
                cells, cell: cells.length ? cells[0] : inst.eliminations[0].cell };
     }
@@ -401,14 +401,14 @@
 
     // 2) Prochain pas logique réel (placement ou élimination) sur le plateau actuel.
     const data = nextHint();
-    if (data) { hint = { data, phase: 1 }; renderHintPanel(); return; }
+    if (data) { hint = { data, phase: 1 }; render(); renderHintPanel(); return; }
 
     // 3) Repli : indice direct depuis la solution.
     const fb = fallbackPlacement();
     if (fb) {
       state.eraser = false; state.lockedNumber = null;
-      selectCell(fb.cell);
       hint = { data: { kind: 'direct', cell: fb.cell, digit: fb.digit }, phase: 2 };
+      selectCell(fb.cell);                   // rend la grille avec l'aperçu du chiffre
       renderHintPanel();
       return;
     }
@@ -593,6 +593,51 @@
     }
   }
 
+  // Surligne l'astuce SUR la grille (phase « Voir la solution ») : cases-clés du motif
+  // en contour ambre, candidats du motif en badge ambre, candidats à retirer barrés en
+  // rouge, et aperçu vert du chiffre à poser. Réutilise le langage visuel de l'entraînement.
+  function applyHintHighlight() {
+    // purge des classes propres à l'astuce (non gérées par la boucle de rendu)
+    for (let i = 0; i < 81; i++) {
+      const cell = cellEls[i];
+      cell.classList.remove('base', 'hl-line', 'hint-place');
+      for (const sp of cell.lastChild.children) sp.classList.remove('elim');
+    }
+    const d = hint.data;
+    if (!d || hint.phase !== 2) return;
+    if (d.kind !== 'place' && d.kind !== 'eliminate' && d.kind !== 'direct') return;
+
+    const hl = d.highlight || {};
+    const baseCells = new Set(hl.cells || []);
+    const unitCells = new Set(hl.unitCells || []);
+    const lineCells = new Set(hl.lineCells || []);
+    const baseDigits = new Set(hl.baseDigits || []);
+    const elims = d.eliminations || hl.elim || [];
+    const elimSet = new Set(elims.map((e) => e.cell * 10 + e.digit));
+
+    for (let i = 0; i < 81; i++) {
+      const cell = cellEls[i];
+      if (unitCells.has(i)) cell.classList.add('hl-unit');
+      if (lineCells.has(i)) cell.classList.add('hl-line');
+      if (baseCells.has(i)) cell.classList.add('base');
+      if (valueAt(i)) continue;
+      for (const sp of cell.lastChild.children) {
+        const n = +sp.dataset.n;
+        if (!state.notes[i].has(n)) continue;
+        if (baseCells.has(i) && baseDigits.has(n)) sp.classList.add('hl');   // badge ambre
+        if (elimSet.has(i * 10 + n)) sp.classList.add('elim');               // barré rouge
+      }
+    }
+
+    // aperçu (vert, translucide) du chiffre à poser
+    if ((d.kind === 'place' || d.kind === 'direct') && d.cell != null && !valueAt(d.cell)) {
+      const cell = cellEls[d.cell];
+      cell.classList.add('hint-place');
+      cell.firstChild.textContent = d.digit;
+      cell.lastChild.style.display = 'none';
+    }
+  }
+
   function render() {
     const active = state.lockedNumber || state.selectedNumber ||
       (state.selectedCell != null ? valueAt(state.selectedCell) : null);
@@ -634,6 +679,8 @@
       cell.classList.toggle('hl-unit', inUnit);
       cell.classList.toggle('hl-same', active != null && v === active && v !== 0);
     }
+
+    applyHintHighlight();
 
     // pavé numérique : compteur de chiffres restants + état verrou
     for (const btn of els.numBtns) {
@@ -760,7 +807,7 @@
     // Panneau d'astuce
     els.hintMore.addEventListener('click', revealHint);
     els.hintPlace.addEventListener('click', placeHint);
-    els.hintClose.addEventListener('click', dismissHint);
+    els.hintClose.addEventListener('click', () => { dismissHint(); render(); });
 
     // Pause
     els.pauseBtn.addEventListener('click', togglePause);

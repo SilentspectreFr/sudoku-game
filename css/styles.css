@@ -16,6 +16,9 @@
   --error: #e0484b;
   --error-bg: #fbe3e4;
   --ok: #21a35a;
+  --amber: #f5a623;        /* ambre : « regarde ce candidat » (badge de note) */
+  --amber-ink: #3a2a00;    /* texte foncé lisible sur le badge ambre */
+  --amber-line: #f59e0b;   /* contour ambre (cases-clés d'une astuce) */
   --shadow: 0 6px 18px rgba(40, 55, 95, .10);
   --radius: 16px;
 }
@@ -131,9 +134,11 @@ html, body {
   pointer-events: none;
 }
 .note { display: flex; align-items: center; justify-content: center; line-height: 1; }
+/* Note mise en avant = « regarde ce candidat ». Badge AMBRE (jamais l'indigo des
+   chiffres posés) : couleur réservée, impossible à confondre avec une valeur placée. */
 .note.hl {
-  color: #fff; font-weight: 800;
-  background: radial-gradient(circle, var(--accent) 0.7em, transparent 0.73em);
+  color: var(--amber-ink); font-weight: 800;
+  background: radial-gradient(circle, var(--amber) 0.72em, transparent 0.75em);
 }
 
 /* overlay (pause / fin) */
@@ -330,9 +335,14 @@ html, body {
 .train-actions button { flex: 1; min-width: 110px; }
 .train-actions button:disabled { opacity: .45; cursor: default; }
 
-/* États pédagogiques du plateau d'entraînement */
+/* États pédagogiques du plateau (entraînement ET astuce de la partie classique) */
 .cell.hl-line { background: var(--hl-unit); }
-.cell.base { background: var(--hl-same); box-shadow: inset 0 0 0 2px var(--accent); }
+/* cases-clés d'une technique : contour AMBRE (= « regarde ces cases »), cohérent
+   avec le badge ambre des notes. */
+.cell.base { background: #fff6e6; box-shadow: inset 0 0 0 2px var(--amber-line); }
 .cell.placed { color: var(--ok); background: #e3f6ec; }
 .cell.placed .cell-value { font-weight: 800; }
 .note.elim { color: var(--error); text-decoration: line-through; font-weight: 800; }
+/* aperçu du chiffre à poser, dans l'astuce de la partie classique */
+.cell.hint-place { box-shadow: inset 0 0 0 2px var(--ok); }
+.cell.hint-place .cell-value { color: var(--ok); opacity: .6; font-weight: 800; }
