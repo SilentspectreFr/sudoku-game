@@ -15,7 +15,7 @@
  * Fonctionne dans une page (self === window) ET dans un service worker
  * (self === worker global, pas de `document`).
  */
-self.APP_VERSION = '1.1.1';
+self.APP_VERSION = '1.2.0';
 
 if (typeof document !== 'undefined') {
   var applyVersion = function () {

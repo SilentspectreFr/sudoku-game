@@ -129,7 +129,6 @@
     pushHistory();
     state.values[i] = 0;
     state.notes[i].clear();
-    if (state.autoNotes) recomputeAutoNotes();   // restaure les candidats libérés par la gomme
     render();
     save();
   }
@@ -185,7 +184,6 @@
     if (state.values[i] === d) {               // re-poser la même valeur = effacer
       pushHistory();
       state.values[i] = 0;
-      if (state.autoNotes) recomputeAutoNotes();
       render();
       save();
       return;
@@ -197,10 +195,10 @@
     state.notes[i].clear();
 
     if (d === state.solution[i]) {
-      // mode Auto : recalcul complet (notes = vrais candidats) ; mode manuel : on
-      // retire seulement ce chiffre des annotations des pairs.
-      if (state.autoNotes) recomputeAutoNotes();
-      else forEachPeer(i, (p) => state.notes[p].delete(d));
+      // nettoyage pratique : on retire ce chiffre des annotations des pairs (jamais une
+      // perte de travail : ce chiffre y est devenu impossible). On NE recalcule PAS tout,
+      // pour préserver les candidats que le joueur a barrés à la main.
+      forEachPeer(i, (p) => state.notes[p].delete(d));
     } else if (!wasWrong) {
       // nouvelle erreur (on ne recompte pas une case déjà fausse)
       state.errors++;
@@ -276,12 +274,13 @@
     render();
   }
 
-  // Recalcule TOUTES les annotations = vrais candidats du plateau. En mode Auto, on
-  // rappelle ceci après chaque changement de valeur : la maintenance purement
-  // soustractive (retirer un chiffre des pairs) ne sait pas RESTAURER un candidat
-  // après une gomme/correction, et les notes finissent désynchronisées des candidats
-  // réels — ce que l'astuce, elle, recalcule toujours (d'où l'impression de bug).
-  function recomputeAutoNotes() {
+  // Remplit toutes les annotations = vrais candidats du plateau, UNE SEULE FOIS.
+  // C'est un coup de pouce de départ : ensuite le bouton est grisé et le joueur reste
+  // maître de ses notes (ses ratures à la main ne sont jamais écrasées). L'astuce, elle,
+  // tient compte des candidats déjà barrés (voir nextHint).
+  function toggleAutoNotes() {
+    if (state.autoNotes) return;                 // déjà utilisé : bouton grisé, sans effet
+    pushHistory();
     const g = buildWorkingGrid();
     for (let i = 0; i < 81; i++) {
       if (valueAt(i)) { state.notes[i].clear(); continue; }
@@ -290,18 +289,7 @@
       for (let d = 1; d <= 9; d++) if (cm & (1 << (d - 1))) set.add(d);
       state.notes[i] = set;
     }
-  }
-
-  // Remplit toutes les annotations possibles, ou les efface si déjà actif.
-  function toggleAutoNotes() {
-    pushHistory();
-    if (state.autoNotes) {
-      for (let i = 0; i < 81; i++) state.notes[i].clear();
-      state.autoNotes = false;
-    } else {
-      recomputeAutoNotes();
-      state.autoNotes = true;
-    }
+    state.autoNotes = true;
     render();
     save();
   }
@@ -334,26 +322,45 @@
     return (lesson && lesson.title) || 'Technique logique';
   }
 
-  // Renvoie le PROCHAIN pas logique réel sur la grille telle que le joueur la voit,
-  // tel quel — placement OU élimination. On NE déroule PAS d'éliminations en silence :
-  // le faire produirait un placement dont l'explication décrit l'état des candidats
-  // APRÈS éliminations (donc faux au regard du plateau). Renvoie null si bloqué.
+  // Une élimination est « déjà faite » par le joueur si, pour CHAQUE case visée qui porte
+  // des annotations, le chiffre à retirer en est déjà absent (il l'a barré à la main, ou
+  // un placement l'a nettoyé). On exige au moins une case annotée, sinon le joueur ne
+  // suit pas ses notes et on ne saute rien.
+  function eliminationAlreadyDone(elims) {
+    let sawNotes = false;
+    for (const e of elims) {
+      const notes = state.notes[e.cell];
+      if (!notes || notes.size === 0) continue;   // case sans notes : on ne peut rien déduire
+      sawNotes = true;
+      if (notes.has(e.digit)) return false;        // ce candidat est encore là -> pas fait
+    }
+    return sawNotes;
+  }
+
+  // Renvoie le PROCHAIN pas logique réel, en tenant compte de la progression du joueur :
+  // les éliminations qu'il a DÉJÀ faites dans ses notes sont avalées en silence, pour lui
+  // montrer la première étape NOUVELLE (placement OU élimination pas encore faite). Les
+  // explications restent vraies (calculées sur les vrais candidats du plateau).
   function nextHint() {
     const T = global.SudokuTech;
     if (!T) return null;
     const g = buildWorkingGrid();
     const cands = T.computeCands(g);
-    const inst = T.solveFull(g, cands);
-    if (!inst) return null;
-    if (inst.placements && inst.placements.length) {
-      const p = inst.placements[0];
-      if (p.digit !== state.solution[p.cell]) return null;     // garde-fou anti-bug détecteur
-      return { kind: 'place', cell: p.cell, digit: p.digit,
-               technique: inst.technique, scope: inst.scope, explain: inst.explain };
-    }
-    if (inst.eliminations && inst.eliminations.length) {
+    for (let guard = 0; guard < 200; guard++) {
+      const inst = T.solveFull(g, cands);
+      if (!inst) return null;
+      if (inst.placements && inst.placements.length) {
+        const p = inst.placements[0];
+        if (p.digit !== state.solution[p.cell]) return null;   // garde-fou anti-bug détecteur
+        return { kind: 'place', cell: p.cell, digit: p.digit,
+                 technique: inst.technique, scope: inst.scope, explain: inst.explain };
+      }
       // garde-fou : une élimination ne doit jamais viser le vrai chiffre de la case.
       for (const e of inst.eliminations) if (state.solution[e.cell] === e.digit) return null;
+      if (eliminationAlreadyDone(inst.eliminations)) {
+        T.applyInstance(g, cands, inst);           // déjà fait par le joueur -> on avance
+        continue;
+      }
       const cells = (inst.highlight && inst.highlight.cells) ? inst.highlight.cells.slice() : [];
       return { kind: 'eliminate', technique: inst.technique, scope: inst.scope,
                explain: inst.explain, eliminations: inst.eliminations.slice(),
@@ -640,7 +647,7 @@
     els.toolErase.classList.toggle('active', state.eraser);
     els.toolPencil.classList.toggle('active', state.pencil);
     els.pencilBadge.textContent = state.pencil ? 'ON' : 'OFF';
-    els.toolAutonotes.classList.toggle('active', state.autoNotes);
+    els.toolAutonotes.disabled = state.autoNotes;   // Auto = coup de pouce unique, puis grisé
     updateUndoBtn();
 
     // entête
