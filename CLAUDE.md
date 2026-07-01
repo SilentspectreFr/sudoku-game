@@ -34,7 +34,14 @@ Pas de modules ES → on peut ouvrir `index.html` directement. Sinon :
   logique**. Toute modif d'un détecteur se **re-teste en Node** : générer N exercices et vérifier
   que chaque instance est **valide contre la solution** (placement = solution ; élimination ≠
   solution). NE JAMAIS livrer un détecteur sans cette validation.
-- `js/trainer.js` — UI du mode entraînement (liste, plateau, indice/solution/explication).
+- `js/trainer.js` — UI du mode entraînement : le joueur **répond sur la grille** (touche la case
+  puis le chiffre, validation immédiate via `SudokuTech.checkAnswer`), indice en 2 crans (méthode,
+  puis zone surlignée), puis solution/explication. Progression par technique en localStorage
+  (`sudoku-trainer:v1`) : badge « Maîtrisée » à 3 réussites consécutives sans « Voir la solution »,
+  carte « Prochaine étape » en tête de liste.
+- `js/board.js` — construction du plateau (81 cases) **partagée** entre game.js et trainer.js
+  (`SudokuBoard.buildBoard(container, onTap)`). Les rendus restent séparés (logiques différentes).
+  ⚠️ Tout nouveau fichier livré doit être ajouté au pré-cache `CORE` de `sw.js`.
 
 ## Mode entraînement — techniques
 18 techniques couvertes : singles + paires/triplets (nus & cachés) + quadruplets nus + pointants +
@@ -56,7 +63,11 @@ inchangé). Ajouter une technique relève le rendement de génération. Garde-fo
 - Pas d'ES modules (scripts `<script>` classiques) pour garder l'ouverture `file://` et un
   déploiement statique sans friction.
 - Mobile-first : Pointer Events, cibles tactiles larges, viewport non-zoomable.
-- Difficulté = nombre d'indices + résolubilité par « singles » (voir `DIFFICULTIES` dans le moteur).
+- Difficulté : **5 niveaux** (facile / moyen / confirmé / difficile / expert) = nombre d'indices
+  (`DIFFICULTIES` dans le moteur) + bande de rang de techniques (`DIFF_BANDS`, plafonds 4/4/9/13/17 :
+  moyen = singles, confirmé = subsets+pointants, difficile ≤ X-Wing, expert = tout l'arsenal).
+  ⚠️ Les clés de niveau ne se renomment JAMAIS (elles vivent dans les sauvegardes localStorage) ;
+  pour retoucher l'échelle, re-calibrer avec `SudokuTech.selfTestGraded(20)` (viser floorRate ≥ 60 %).
 
 ## Versioning (source unique) — IMPORTANT pour la maintenance
 `js/version.js` définit **`APP_VERSION`** (semver `MAJOR.MINOR.PATCH`). C'est le **seul** endroit
