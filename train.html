@@ -26,8 +26,8 @@
 
     <!-- Vue liste des techniques -->
     <section id="view-list">
-      <p class="train-intro">Chaque technique vient avec un <strong>exercice réel</strong> : à toi de la
-        repérer, puis affiche l’indice, la solution et l’explication.</p>
+      <p class="train-intro">Chaque technique vient avec un <strong>exercice réel</strong> : repère-la,
+        puis <strong>joue ta réponse sur la grille</strong>. Des indices t’aident en cas de blocage.</p>
       <div id="lesson-groups"></div>
     </section>
 
@@ -49,6 +49,20 @@
         </div>
       </div>
 
+      <p class="train-task" id="train-task" hidden></p>
+
+      <div class="numpad train-numpad" id="train-numpad">
+        <button class="num" type="button" data-d="1">1</button>
+        <button class="num" type="button" data-d="2">2</button>
+        <button class="num" type="button" data-d="3">3</button>
+        <button class="num" type="button" data-d="4">4</button>
+        <button class="num" type="button" data-d="5">5</button>
+        <button class="num" type="button" data-d="6">6</button>
+        <button class="num" type="button" data-d="7">7</button>
+        <button class="num" type="button" data-d="8">8</button>
+        <button class="num" type="button" data-d="9">9</button>
+      </div>
+
       <div class="explain" id="explain" hidden></div>
 
       <div class="train-actions">
@@ -64,6 +78,7 @@
 
   <script src="js/version.js"></script>
   <script src="js/sudoku-engine.js"></script>
+  <script src="js/board.js"></script>
   <script src="js/techniques.js"></script>
   <script src="js/trainer.js"></script>
 </body>

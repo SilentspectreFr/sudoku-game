@@ -58,6 +58,15 @@ for (const diff of Object.keys(T.DIFF_BANDS)) {
   else ok(`${diff} : ${N_GRADED} grilles 100% résolubles par l'arsenal (≤ rang ${ceil})`);
 }
 
+// 2c) Niveaux — moteur et techniques alignés sur les 5 mêmes clés.
+console.log('Niveaux — cohérence moteur/techniques :');
+{
+  const dk = Object.keys(E.DIFFICULTIES).join(','), bk = Object.keys(T.DIFF_BANDS).join(',');
+  (dk === bk && Object.keys(E.DIFFICULTIES).length === 5)
+    ? ok(`5 niveaux, clés DIFFICULTIES == DIFF_BANDS (${dk})`)
+    : fail(`désalignement niveaux : moteur=[${dk}] techniques=[${bk}]`);
+}
+
 // 3) Techniques — chaque exercice généré est valide contre la solution.
 console.log('Techniques — validité des exercices :');
 const validInstance = (inst, solution) => {
@@ -77,6 +86,35 @@ for (const lesson of T.LESSONS) {
   if (invalid > 0) fail(`${lesson.id} : ${invalid}/${made} instances INVALIDES`);
   else if (made === 0) fail(`${lesson.id} : aucun exercice généré`);
   else ok(`${lesson.id} : ${made} exercice(s) valide(s)`);
+}
+
+// 4) checkAnswer — validation d'une réponse joueur (pur, sans DOM).
+console.log('Entraînement — validation de réponse (checkAnswer) :');
+{
+  const exP = T.generateExercise('nakedSingle', 4000);
+  if (!exP || !exP.instance.placements) fail('checkAnswer : pas d\'exercice de placement généré');
+  else {
+    const p = exP.instance.placements[0];
+    const good = T.checkAnswer(exP.instance, p.cell, p.digit);
+    const wrongDigit = T.checkAnswer(exP.instance, p.cell, (p.digit % 9) + 1);
+    const wrongCell = T.checkAnswer(exP.instance, (p.cell + 1) % 81, p.digit);
+    (good.kind === 'place' && good.correct && !wrongDigit.correct && !wrongCell.correct)
+      ? ok('placement : bonne réponse acceptée, mauvaises refusées')
+      : fail(`placement : good=${good.correct} wrongDigit=${wrongDigit.correct} wrongCell=${wrongCell.correct}`);
+  }
+
+  const exE = T.generateExercise('nakedPair', 4000);
+  if (!exE || !exE.instance.eliminations) fail('checkAnswer : pas d\'exercice d\'élimination généré');
+  else {
+    const elims = exE.instance.eliminations;
+    const allGood = elims.every((e) => T.checkAnswer(exE.instance, e.cell, e.digit).correct);
+    // couple hors liste : une case déjà remplie ne porte aucune élimination
+    const filled = exE.grid.findIndex((v) => v !== 0);
+    const bad = T.checkAnswer(exE.instance, filled, exE.grid[filled]);
+    (allGood && bad.kind === 'elim' && !bad.correct)
+      ? ok(`élimination : ${elims.length} attendue(s) acceptée(s), hors-liste refusé`)
+      : fail(`élimination : allGood=${allGood} bad=${bad.correct}`);
+  }
 }
 
 console.log('');

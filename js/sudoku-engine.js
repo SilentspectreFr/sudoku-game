@@ -163,6 +163,7 @@
   const DIFFICULTIES = {
     facile:    { label: 'Facile',    minGivens: 42, singlesOnly: true,  maxAttempts: 25 },
     moyen:     { label: 'Moyen',     minGivens: 35, singlesOnly: true,  maxAttempts: 30 },
+    confirme:  { label: 'Confirmé',  minGivens: 32, singlesOnly: false, maxAttempts: 40 },
     difficile: { label: 'Difficile', minGivens: 30, singlesOnly: false, maxAttempts: 50 },
     expert:    { label: 'Expert',    minGivens: 26, singlesOnly: false, maxAttempts: 60 },
   };

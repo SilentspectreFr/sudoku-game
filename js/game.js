@@ -312,13 +312,23 @@
     return (T && T.cellName) ? T.cellName(i) : ('L' + (rowOf(i) + 1) + 'C' + (colOf(i) + 1));
   }
 
+  // Leçon du catalogue associée à une donnée d'astuce (cas particulier du
+  // singleton caché : la leçon dépend du scope, boîte vs global).
+  function lessonFor(data) {
+    const T = global.SudokuTech;
+    if (!T || !T.LESSON_BY_ID) return null;
+    if (data.technique === 'hiddenSingle') {
+      return data.scope === 'box' ? T.LESSON_BY_ID.lastRemaining : T.LESSON_BY_ID.hiddenSingle;
+    }
+    return T.LESSON_BY_ID[data.technique] || null;
+  }
+
   // Titre lisible d'une technique ; cas particulier du singleton caché (boîte vs global).
   function hintTitle(data) {
-    const T = global.SudokuTech;
     if (data.technique === 'hiddenSingle') {
       return data.scope === 'box' ? 'Dernière case restante' : 'Singleton caché';
     }
-    const lesson = (T && T.LESSON_BY_ID) ? T.LESSON_BY_ID[data.technique] : null;
+    const lesson = lessonFor(data);
     return (lesson && lesson.title) || 'Technique logique';
   }
 
@@ -456,9 +466,11 @@
       html = '<strong>Indice direct —</strong> aucune technique simple ne s\'applique ici. ' +
              'Place le <strong>' + d.digit + '</strong> en <strong>' + cellLabel(d.cell) + '</strong>.';
       showPlace = true;
-    } else if (hint.phase === 1) {            // 'place'/'eliminate', phase 1 : nom seul
-      html = '<strong>Technique —</strong> ' + hintTitle(d) +
-             '.<br><span class="hint-sub">Touche « Voir la solution » pour le détail.</span>';
+    } else if (hint.phase === 1) {            // phase 1 : mini-leçon (définition) sans la réponse
+      const lesson = lessonFor(d);
+      html = '<strong>Technique — ' + hintTitle(d) + '.</strong> ' +
+             (lesson ? lesson.summary + ' ' : '') +
+             '<br><span class="hint-sub">Cherche-la sur la grille, ou touche « Voir la solution » pour voir où elle s\'applique ici.</span>';
       showMore = true;
     } else if (d.kind === 'place') {          // phase 2 : placement concret
       html = '<strong>' + hintTitle(d) + ' —</strong> ' + (d.explain || '') +
@@ -469,7 +481,7 @@
       const what = d.eliminations.map((e) => 'le ' + e.digit + ' en ' + cellLabel(e.cell)).join(', ');
       html = '<strong>' + hintTitle(d) + ' —</strong> ' + (d.explain || '') +
              '<br><span class="hint-sub">Pas de chiffre à poser ici : retire ' + what +
-             ' de tes notes, puis redemande une astuce pour la suite.</span>';
+             ' de tes notes — c\'est exactement ce que la technique démontre — puis redemande une astuce pour la suite.</span>';
     }
 
     els.hintBody.innerHTML = html;
@@ -562,37 +574,6 @@
   }
 
   // ---- Rendu ----------------------------------------------------------------
-  function buildBoard() {
-    els.board.innerHTML = '';
-    cellEls = [];
-    for (let i = 0; i < 81; i++) {
-      const cell = document.createElement('button');
-      cell.className = 'cell';
-      cell.dataset.index = i;
-      if (colOf(i) % 3 === 2 && colOf(i) !== 8) cell.classList.add('b-right');
-      if (rowOf(i) % 3 === 2 && rowOf(i) !== 8) cell.classList.add('b-bottom');
-
-      const val = document.createElement('span');
-      val.className = 'cell-value';
-      cell.appendChild(val);
-
-      const notes = document.createElement('span');
-      notes.className = 'cell-notes';
-      for (let n = 1; n <= 9; n++) {
-        const sp = document.createElement('span');
-        sp.className = 'note';
-        sp.dataset.n = n;
-        notes.appendChild(sp);
-      }
-      cell.appendChild(notes);
-
-      cell.addEventListener('click', () => selectCell(i));
-      cell.addEventListener('contextmenu', (e) => e.preventDefault());
-      els.board.appendChild(cell);
-      cellEls.push(cell);
-    }
-  }
-
   // Surligne l'astuce SUR la grille (phase « Voir la solution ») : cases-clés du motif
   // en contour ambre, candidats du motif en badge ambre, candidats à retirer barrés en
   // rouge, et aperçu vert du chiffre à poser. Réutilise le langage visuel de l'entraînement.
@@ -779,7 +760,7 @@
     };
     els.numBtns = Array.from(els.numpad.querySelectorAll('.num'));
 
-    buildBoard();
+    cellEls = global.SudokuBoard.buildBoard(els.board, selectCell);
 
     // Pavé numérique : appui court vs appui long.
     for (const btn of els.numBtns) {

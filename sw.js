@@ -18,6 +18,7 @@ const CORE = [
   './css/styles.css',
   './js/version.js',
   './js/sudoku-engine.js',
+  './js/board.js',
   './js/game.js',
   './js/main.js',
   './js/techniques.js',

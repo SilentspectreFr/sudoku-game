@@ -590,12 +590,16 @@
   // Bandes de difficulté : on conserve les minGivens du moteur (ressenti inchangé) et on
   // AJOUTE une borne par rang de technique. floor = il faut au moins une technique de ce
   // rang ; ceil = rien au-dessus (et la grille DOIT être résoluble par l'arsenal).
-  //   facile/moyen : singles only (ceil 4). difficile : au-delà des singles. expert :
-  //   préfère une technique avancée (floor 13), plancher relâchable si le budget l'exige.
+  // Échelle 5 niveaux (plafonds 4 / 4 / 9 / 13 / 17) :
+  //   facile/moyen : singles only (ceil 4), moyen préfère exiger un vrai singleton caché ;
+  //   confirmé : subsets (paires/triplets) + pointants, sans plus ;
+  //   difficile : jusqu'au X-Wing (les wings/swordfish sont réservés à expert) ;
+  //   expert : tout l'arsenal, préfère une structure avancée (floor 13).
   const DIFF_BANDS = {
     facile:    { minGivens: 42, floor: 1, ceil: 4,  preferFloor: 1,  maxAttempts: 40 },
-    moyen:     { minGivens: 35, floor: 1, ceil: 4,  preferFloor: 1,  maxAttempts: 40 },
-    difficile: { minGivens: 30, floor: 5, ceil: 17, preferFloor: 5,  maxAttempts: 120 },
+    moyen:     { minGivens: 35, floor: 1, ceil: 4,  preferFloor: 4,  maxAttempts: 60 },
+    confirme:  { minGivens: 32, floor: 5, ceil: 9,  preferFloor: 5,  maxAttempts: 120 },
+    difficile: { minGivens: 30, floor: 5, ceil: 13, preferFloor: 9,  maxAttempts: 160 },
     expert:    { minGivens: 26, floor: 5, ceil: 17, preferFloor: 13, maxAttempts: 200 },
   };
 
@@ -662,6 +666,16 @@
     return true;
   }
 
+  // Vérifie une proposition du joueur (case + chiffre) contre l'instance d'un
+  // exercice : le placement attendu, ou l'UNE des éliminations attendues.
+  // -> { kind: 'place'|'elim', correct: boolean }
+  function checkAnswer(inst, cell, digit) {
+    if (inst.placements) {
+      return { kind: 'place', correct: inst.placements.some((p) => p.cell === cell && p.digit === digit) };
+    }
+    return { kind: 'elim', correct: (inst.eliminations || []).some((e) => e.cell === cell && e.digit === digit) };
+  }
+
   // =========================================================================
   //  CATALOGUE DES LEÇONS (vague 1)
   // =========================================================================
@@ -698,19 +712,19 @@
     },
     {
       id: 'nakedPair', title: 'Paires nues', level: 'technique', rank: 5,
-      detect: (g, c, out) => detectNakedSubset(g, c, 2, out), gen: ['difficile', 'expert'],
+      detect: (g, c, out) => detectNakedSubset(g, c, 2, out), gen: ['confirme', 'difficile', 'expert'],
       summary: 'Deux cases d’une même unité qui portent exactement les deux mêmes candidats {a, b} se réservent ces deux chiffres : on les retire des autres cases de l’unité.',
       how: 'Cherche deux cases alignées (même ligne, colonne ou bloc) avec le même couple de candidats. Ces deux chiffres n’iront nulle part ailleurs dans l’unité.',
     },
     {
       id: 'nakedTriple', title: 'Triplets nus', level: 'technique', rank: 6,
-      detect: (g, c, out) => detectNakedSubset(g, c, 3, out), gen: ['difficile', 'expert'],
+      detect: (g, c, out) => detectNakedSubset(g, c, 3, out), gen: ['confirme', 'difficile', 'expert'],
       summary: 'Trois cases d’une même unité dont les candidats tiennent en trois chiffres {a, b, c} se réservent ces trois chiffres (chaque case n’a pas besoin des trois).',
       how: 'Trois cases d’une unité dont l’union des candidats fait exactement trois chiffres. On retire ces chiffres des autres cases de l’unité.',
     },
     {
       id: 'hiddenPair', title: 'Paires cachées', level: 'technique', rank: 7,
-      detect: (g, c, out) => detectHiddenSubset(g, c, 2, out), gen: ['difficile', 'expert'],
+      detect: (g, c, out) => detectHiddenSubset(g, c, 2, out), gen: ['confirme', 'difficile', 'expert'],
       summary: 'Deux chiffres qui, dans une unité, ne peuvent se placer que dans les deux mêmes cases : ces cases leur sont réservées, on en retire tous les autres candidats.',
       how: 'Trouve deux chiffres dont les seules cases possibles dans l’unité sont les deux mêmes. Nettoie ces deux cases de leurs autres candidats.',
     },
@@ -722,7 +736,7 @@
     },
     {
       id: 'pointingPair', title: 'Paires pointantes', level: 'technique', rank: 9,
-      detect: (g, c, out) => detectPointing(g, c, 2, out), gen: ['difficile', 'expert'],
+      detect: (g, c, out) => detectPointing(g, c, 2, out), gen: ['confirme', 'difficile', 'expert'],
       summary: 'Dans un bloc, si un chiffre n’a que deux cases candidates et qu’elles sont sur la même ligne (ou colonne), ce chiffre quitte le reste de cette ligne/colonne.',
       how: 'Un chiffre confiné à deux cases d’un bloc, alignées : il « pointe » sur cette ligne/colonne et s’élimine ailleurs sur celle-ci.',
     },
@@ -734,7 +748,7 @@
     },
     {
       id: 'claiming', title: 'Réduction ligne→bloc', level: 'technique', rank: 10,
-      detect: (g, c, out) => detectClaiming(g, c, out), gen: ['difficile', 'expert'],
+      detect: (g, c, out) => detectClaiming(g, c, out), gen: ['confirme', 'difficile', 'expert'],
       summary: 'Le complément du pointant : si dans une ligne (ou colonne) un chiffre n’a de candidats que dans un seul bloc, ce chiffre quitte le reste de ce bloc.',
       how: 'Un chiffre confiné, dans une ligne/colonne, aux cases d’un seul bloc : on le « revendique » pour ce bloc et on l’élimine des autres cases du bloc.',
     },
@@ -847,7 +861,7 @@
 
   global.SudokuTech = {
     LESSONS, LESSON_BY_ID,
-    computeCands, applyInstance, solveBelow, generateExercise, detectAllInstances,
+    computeCands, applyInstance, solveBelow, generateExercise, detectAllInstances, checkAnswer,
     detectFullHouse, detectHiddenSingle, detectNakedSingle,
     detectNakedSubset, detectHiddenSubset, detectPointing, detectClaiming,
     detectFish, detectYWing, detectXYZWing, detectWWing, solveFull,
